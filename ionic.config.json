@@ -1,0 +1,7 @@
+{
+  "name": "webcam-manage-ekyc-experiment",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
