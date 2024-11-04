@@ -3,8 +3,9 @@ import { ActionSheetController, IonContent, ModalController, NavController, Plat
 import { Subscription, fromEvent } from 'rxjs';
 import { ImagePreviewComponent } from 'src/app/components/image-preview/image-preview.component';
 import { CameraErrorCode, CameraManager, FacingMode, ImageFormat, VideoResolutionPreset } from 'src/app/lib/camera.manager';
-import { Resolution, STANDARD_RESOLUTIONS } from 'src/app/lib/types/resolution.types';
-import { ThemeService } from 'src/app/theme.service';
+import { STANDARD_RESOLUTIONS } from 'src/app/lib/constants/resolution.preset';
+import { Resolution } from 'src/app/lib/types/resolution.types';
+import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
   selector: 'app-camera-test',
@@ -59,17 +60,20 @@ export class CameraTestPage implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngAfterViewInit() {
-    if (!this.videoElement || !this.canvasElement) {
-      console.error('Required elements not initialized');
-      return;
-    }
+    try {
+      if (!this.videoElement || !this.canvasElement) {
+        throw new Error('Video element or canvas element not found');
+      }
 
-    // เพิ่ม visibility change listener
-    this.subscriptions.push(
-      fromEvent(document, 'visibilitychange').subscribe(() => {
-        this.handleVisibilityChange();
-      })
-    );
+      // เพิ่ม visibility change listener
+      this.subscriptions.push(
+        fromEvent(document, 'visibilitychange').subscribe(() => {
+          this.handleVisibilityChange();
+        })
+      );
+    } catch (error: any) {
+      this.handleCameraError('ngAfterViewInit', error.message);
+    }
   }
 
   ngOnDestroy() {
@@ -339,7 +343,6 @@ export class CameraTestPage implements OnInit, OnDestroy, AfterViewInit {
     const { data } = await modal.onWillDismiss();
   }
 
-
   private async showToast(message: string) {
     const toast = await this.toastCtrl.create({
       message,
@@ -348,7 +351,6 @@ export class CameraTestPage implements OnInit, OnDestroy, AfterViewInit {
     });
     await toast.present();
   }
-
 
   async retryInitialization() {
     await this.cleanup();
@@ -399,10 +401,8 @@ export class CameraTestPage implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private async cleanup() {
-    if (this.cameraManager) {
-      await this.cameraManager.stopCamera();
-      this.cameraManager.destroy();
-    }
+    await this.cameraManager.stopCamera();
+    this.cameraManager.destroy();
     this.isCameraReady = false;
     this.error = null;
   }

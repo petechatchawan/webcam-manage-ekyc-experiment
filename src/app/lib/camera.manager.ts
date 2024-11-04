@@ -1,6 +1,8 @@
 import { BehaviorSubject } from "rxjs";
 import { UAInfo } from "./ua-info";
-import { Resolution, STANDARD_RESOLUTIONS } from "./types/resolution.types";
+import { STANDARD_RESOLUTIONS } from "./constants/resolution.preset";
+import { Resolution } from "./types/resolution.types";
+import { EventEmitter } from "@angular/core";
 
 // ================== Types & Interfaces ==================
 export interface CameraConfig {
@@ -123,6 +125,10 @@ class CameraEvents {
         if (!this.eventListeners[event]) return;
         this.eventListeners[event] = this.eventListeners[event].filter(h => h !== handler);
     }
+
+    clear(): void {
+        this.eventListeners = {};
+    }
 }
 
 // ================== Main Camera Manager Class ==================
@@ -140,7 +146,6 @@ export class CameraManager {
     private isGetUserMediaSupported: boolean = false;
     private isPermissionGranted: boolean = false;
     private availableDevices: MediaDeviceInfo[] = [];
-    private deviceCapabilities: Map<string, MediaTrackCapabilities> = new Map();
 
     private isCameraInitializedFlag: boolean = false;
     private capturedImage: CapturedImage | null = null;
@@ -164,7 +169,9 @@ export class CameraManager {
 
     // ================== Public Methods ==================
 
+    // สำหรับจัดการ Event
     public on(event: CameraEvent, handler: EventHandler): void {
+        console.log(`[CameraManager] Listen to event: ${event}`);
         this.events.on(event, handler);
     }
 
@@ -199,6 +206,16 @@ export class CameraManager {
             this.currentCameraConfig.videoElement.srcObject = null;
         }
         this.emitSuccess('STOP_CAMERA');
+    }
+
+    public async checkCameraActive(): Promise<boolean> {
+        try {
+            const track = this.getCurrentStream()?.getVideoTracks()[0];
+            return track?.readyState === 'live';
+        } catch (error) {
+            console.error('Error checking camera state:', error);
+            return false;
+        }
     }
 
     public async switchCamera(): Promise<void> {
@@ -359,57 +376,36 @@ export class CameraManager {
     }
 
     /**
-   * เริ่มกล้องด้วยความละเอียดที่ระบุ
-   */
-    // ใน CameraManager class
+     * เริ่มกล้องด้วยความละเอียดที่ระบุ
+     */
     public async startCameraWithResolution(allowFallback: boolean = false): Promise<void> {
         try {
-            console.log('startCameraWithResolution: Trying to start camera with specified configuration');
-            try {
-                await this.startCamera();
-            } catch (error: any) {
-                console.log('startCameraWithResolution: Error occurred while starting camera with specified configuration', error);
-                if (error.name === 'OverconstrainedError' &&
-                    allowFallback &&
-                    this.currentCameraConfig.fallbackResolution
-                ) {
-                    // สร้าง deep copy ของ resolution ปัจจุบัน
-                    const prevResolution: Resolution = {
-                        width: this.currentCameraConfig.resolution?.width ?? 0,
-                        height: this.currentCameraConfig.resolution?.height ?? 0,
-                        aspectRatio: this.currentCameraConfig.resolution?.aspectRatio ?? 0,
-                        name: this.currentCameraConfig.resolution?.name ?? ''
-                    };
-
-                    console.log('startCameraWithResolution: Trying to start camera with fallback resolution', this.currentCameraConfig.fallbackResolution);
-
-                    // ตรวจสอบว่า fallbackResolution มีค่าครบ
-                    if (this.isValidResolutionSpec(this.currentCameraConfig.fallbackResolution)) {
-                        this.currentCameraConfig.resolution = this.currentCameraConfig.fallbackResolution;
-
-                        try {
-                            await this.startCamera();
-                            console.log('startCameraWithResolution: Successfully started camera with fallback resolution');
-                        } catch (fallbackError) {
-                            console.log('startCameraWithResolution: Error occurred while starting camera with fallback resolution', fallbackError);
-                            // คืนค่า resolution เดิมถ้า fallback ไม่สำเร็จ
-                            this.currentCameraConfig.resolution = prevResolution;
-                            throw fallbackError;
-                        }
-                    } else {
-                        throw new Error('Invalid fallback resolution specification');
+            await this.startCamera();
+        } catch (error: any) {
+            if (error.name === 'OverconstrainedError' &&
+                allowFallback &&
+                this.currentCameraConfig.fallbackResolution
+            ) {
+                const prevResolution: Resolution = {
+                    width: this.currentCameraConfig.resolution?.width ?? 0,
+                    height: this.currentCameraConfig.resolution?.height ?? 0,
+                    aspectRatio: this.currentCameraConfig.resolution?.aspectRatio ?? 0,
+                    name: this.currentCameraConfig.resolution?.name ?? ''
+                };
+                if (this.isValidResolutionSpec(this.currentCameraConfig.fallbackResolution)) {
+                    this.currentCameraConfig.resolution = this.currentCameraConfig.fallbackResolution;
+                    try {
+                        await this.startCamera();
+                    } catch (fallbackError) {
+                        this.currentCameraConfig.resolution = prevResolution;
+                        throw fallbackError;
                     }
                 } else {
-                    throw error;
+                    throw new Error('Invalid fallback resolution specification');
                 }
+            } else {
+                throw error;
             }
-        } catch (error) {
-            console.log('startCameraWithResolution: Error occurred during initialization', error);
-            this.emitError('ERROR', this.createError(
-                CameraErrorCode.INITIALIZATION_ERROR,
-                'Failed to start camera with specified configuration',
-                error
-            ));
         }
     }
 
@@ -617,32 +613,6 @@ export class CameraManager {
         return currentValue !== newConstraint;
     }
 
-    private async getDeviceCapabilities(deviceId: string): Promise<MediaTrackCapabilities> {
-        if (this.deviceCapabilities.has(deviceId)) {
-            return this.deviceCapabilities.get(deviceId)!;
-        }
-
-        try {
-            const stream = await this.getUserMedia({
-                video: { deviceId: { exact: deviceId } }
-            });
-
-            if (!stream) throw new Error('Failed to get stream for capabilities');
-
-            const track = stream.getVideoTracks()[0];
-            const capabilities = track.getCapabilities();
-            this.deviceCapabilities.set(deviceId, capabilities);
-            track.stop();
-            return capabilities;
-        } catch (error) {
-            throw this.createError(
-                CameraErrorCode.DEVICE_NOT_FOUND,
-                'Failed to get device capabilities',
-                error
-            );
-        }
-    }
-
     private async initializeStream(constraints: MediaStreamConstraints): Promise<MediaStream> {
         const startTime = performance.now();
 
@@ -650,7 +620,6 @@ export class CameraManager {
             const stream = await this.getUserMedia(constraints);
             if (!stream) throw new Error('Failed to get stream');
 
-            // Monitor frame rate
             if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
                 let frameCount = 0;
                 let lastCheck = performance.now();
@@ -673,7 +642,6 @@ export class CameraManager {
             }
 
             this.metrics.startupTime = performance.now() - startTime;
-
             return stream;
         } catch (error: any) {
             if (error.name === 'NotReadableError') {
@@ -701,7 +669,7 @@ export class CameraManager {
                 : this.currentCameraConfig.facingMode,
             width: { exact: width },
             height: { exact: height },
-            aspectRatio: { exact: width / height }
+            aspectRatio: { ideal: width / height }
         };
 
         if (videoConstraints.facingMode === undefined) {
@@ -1064,15 +1032,20 @@ export class CameraManager {
         }
     }
 
+
+
     public destroy(): void {
+        console.log('[CameraManager]: Destroying');
+        // ยกเลิก event listeners
+        this.events.clear();
         this.stopCamera();
-        this.deviceCapabilities.clear();
         this.metrics = {
             startupTime: 0,
             frameRate: 0,
             resolutionChanges: 0,
             errors: []
         };
+        console.log('[CameraManager]: Destroyed');
     }
 
 

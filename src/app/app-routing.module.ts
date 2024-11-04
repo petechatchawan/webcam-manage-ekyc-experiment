@@ -22,6 +22,10 @@ const routes: Routes = [
   {
     path: 'camera-test',
     loadChildren: () => import('./pages/camera-test/camera-test.module').then( m => m.CameraTestPageModule)
+  },
+  {
+    path: 'id-card-front',
+    loadChildren: () => import('./pages/id-card-front/id-card-front.module').then( m => m.IdCardFrontPageModule)
   }
 ];
 

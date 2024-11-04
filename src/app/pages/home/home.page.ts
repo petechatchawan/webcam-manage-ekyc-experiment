@@ -1,8 +1,8 @@
-import { CameraCapability, CameraManager } from 'src/app/lib/camera.manager';
+import { CameraCapability, CameraManager, VideoResolutionPreset } from 'src/app/lib/camera.manager';
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { ThemeService } from '../../theme.service';
-import { STANDARD_RESOLUTIONS, VideoResolutionPreset } from 'src/app/lib/types/resolution.types';
+import { STANDARD_RESOLUTIONS } from 'src/app/lib/constants/resolution.preset';
+import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
   selector: 'app-home',

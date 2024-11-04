@@ -1,0 +1,126 @@
+<ion-header class="bg-primary">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/"></ion-back-button>
+    </ion-buttons>
+    <ion-title>สแกนบัตรประชาชน</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="max-w-md mx-auto space-y-4">
+    <!-- กล้อง Preview -->
+    <p class="text-center font-bold my-4">{{processingTime}} ms.</p>
+    <div class="relative aspect-[16/9] bg-black rounded-lg overflow-hidden">
+      <!-- Video Preview -->
+      <video
+        #videoElement
+        class="absolute inset-0 w-full h-full object-cover"
+        autoplay
+        playsinline></video>
+
+      <!-- Hidden Canvas -->
+      <canvas
+        #canvasElement
+        class="hidden"></canvas>
+
+      <!-- Loading Overlay -->
+      <div
+        *ngIf="isLoading"
+        class="absolute inset-0 bg-black/50 flex items-center justify-center">
+        <ion-spinner
+          name="circular"
+          class="text-white"></ion-spinner>
+      </div>
+
+      <!-- ID Card Overlay -->
+      <div class="absolute inset-0 flex items-center justify-center">
+        <div
+          class="relative w-[85%] aspect-[1.586] border-2 
+                    {{ isCardDetected ? 'border-green-500' : 'border-white' }} 
+                    border-dashed rounded-lg">
+          <!-- ข้อความแนะนำ -->
+          <div
+            *ngIf="!isCardDetected"
+            class="absolute -top-8 left-0 right-0 text-center text-white text-sm">
+            กรุณาวางบัตรให้อยู่ในกรอบ
+          </div>
+          <!-- ไฟแสดงสถานะการตรวจจับ -->
+          <div
+            *ngIf="isCardDetected"
+            class="absolute -top-8 left-0 right-0 flex items-center justify-center space-x-2">
+            <span class="animate-ping inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
+            <span class="text-green-400 text-sm">ตรวจพบบัตรประชาชน</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ปุ่มถ่ายภาพ -->
+      <!-- <button
+        *ngIf="isCardDetected"
+        (click)="captureImage()"
+        class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-gray-900 rounded-full w-16 h-16 flex items-center justify-center focus:outline-none">
+        <div class="w-12 h-12 rounded-full border-4 border-gray-900"></div>
+      </button> -->
+
+      <!-- ปุ่มสลับกล้อง -->
+      <button
+        (click)="switchCamera()"
+        class="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full">
+        <svg
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- แสดงผล OCR -->
+    <!-- <div
+      *ngIf="ocrResult$ | async as result"
+      class="bg-white rounded-lg shadow-lg p-4 space-y-4 animate-fade-in">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold">ผลการสแกน</h3>
+        <div class="text-sm text-gray-500">ความแม่นยำ: {{result.confidence}}%</div>
+      </div>
+
+      <div class="space-y-3">
+        <div class="flex justify-between items-center py-2 border-b">
+          <span class="text-gray-600">เลขบัตรประชาชน</span>
+          <span class="font-medium">{{result.idNumber || '-'}}</span>
+        </div>
+        <div class="flex justify-between items-center py-2 border-b">
+          <span class="text-gray-600">ชื่อ-นามสกุล</span>
+          <span class="font-medium">{{result.fullName || '-'}}</span>
+        </div>
+        <div class="flex justify-between items-center py-2 border-b">
+          <span class="text-gray-600">วันเกิด</span>
+          <span class="font-medium">{{result.dateOfBirth || '-'}}</span>
+        </div>
+        <div class="flex justify-between items-center py-2 border-b">
+          <span class="text-gray-600">ที่อยู่</span>
+          <span class="font-medium">{{result.address || '-'}}</span>
+        </div>
+      </div>
+
+      <div class="flex space-x-3">
+        <button
+          (click)="retakePhoto()"
+          class="flex-1 py-2 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus:outline-none">
+          ถ่ายใหม่
+        </button>
+        <button
+          (click)="confirmAndProceed()"
+          class="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none">
+          ยืนยันข้อมูล
+        </button>
+      </div>
+    </div> -->
+  </div>
+</ion-content>
