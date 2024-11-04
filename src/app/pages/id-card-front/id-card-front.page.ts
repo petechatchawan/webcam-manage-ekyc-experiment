@@ -1,7 +1,7 @@
 import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { AlertController, LoadingController, NavController, Platform, ToastController } from '@ionic/angular';
 import { BehaviorSubject, fromEvent, Subject, Subscription } from 'rxjs';
-import { CameraExtension } from 'src/app/lib/camera-extension';
+import { CameraDeviceSelector } from 'src/app/lib/camera-devices-selector';
 import { CameraErrorCode, CameraManager, CapturedImage, ImageFormat, VideoResolutionPreset } from 'src/app/lib/camera.manager';
 import { CropPresets } from 'src/app/lib/constants/crop-preset';
 import { STANDARD_RESOLUTIONS } from 'src/app/lib/constants/resolution.preset';
@@ -165,9 +165,9 @@ export class IdCardFrontPage implements OnInit, AfterViewInit, OnDestroy {
         throw new Error('Camera not supported or not checked');
       }
 
-      const cameraExtension = new CameraExtension();
+      const cameraExtension = new CameraDeviceSelector();
       const allDevices = await this.cameraManager.getCameraDevices();
-      const selectedCamera = await cameraExtension.selectCamera(allDevices, FacingMode.Front);
+      const selectedCamera = await cameraExtension.selectOptimalCamera(allDevices, FacingMode.Front);
       if (!selectedCamera) {
         throw new Error('No camera device found');
       }
