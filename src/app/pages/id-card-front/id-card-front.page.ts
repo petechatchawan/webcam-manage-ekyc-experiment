@@ -167,7 +167,7 @@ export class IdCardFrontPage implements OnInit, AfterViewInit, OnDestroy {
 
       const cameraExtension = new CameraDeviceSelector();
       const allDevices = await this.cameraManager.getCameraDevices();
-      const selectedCamera = await cameraExtension.selectOptimalCamera(allDevices, FacingMode.Front);
+      const selectedCamera = await cameraExtension.selectCamera(allDevices, FacingMode.Front);
       if (!selectedCamera) {
         throw new Error('No camera device found');
       }
