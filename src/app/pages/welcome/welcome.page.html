@@ -1,0 +1,28 @@
+<ion-content class="bg-gradient-to-b from-blue-500 to-blue-700 dark:from-blue-800 dark:to-blue-900">
+  <div class="h-full flex flex-col items-center justify-center p-6 text-center">
+    <!-- Logo/Icon -->
+    <div class="w-24 h-24 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center mb-8 shadow-lg">
+      <ion-icon
+        name="camera"
+        class="text-5xl text-blue-500 dark:text-blue-400"></ion-icon>
+    </div>
+
+    <!-- Welcome Text -->
+    <h1 class="text-3xl font-bold text-white mb-4">Welcome to Camera Suite</h1>
+    <p class="text-blue-100 mb-8 max-w-md">
+      Test your camera, scan documents, and perform face detection with our comprehensive testing suite
+    </p>
+
+    <!-- Start Button -->
+    <ion-button
+      (click)="startCheck()"
+      expand="block"
+      class="w-full max-w-xs font-semibold text-lg h-12"
+      shape="round">
+      Get Started
+      <ion-icon
+        name="arrow-forward"
+        slot="end"></ion-icon>
+    </ion-button>
+  </div>
+</ion-content>

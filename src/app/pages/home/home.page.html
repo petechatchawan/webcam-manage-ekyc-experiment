@@ -1,0 +1,325 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+    <ion-buttons slot="start">
+      <ion-button (click)="goToWelcome()">
+        <ion-icon
+          name="chevron-back-outline"
+          class="text-gray-600 dark:text-gray-300"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title class="text-xl font-semibold text-gray-900 dark:text-white">Camera Testing Suite</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="themeService.toggleTheme()">
+        <ion-icon
+          [name]="(themeService.isDarkMode$ | async) ? 'sunny' : 'moon'"
+          class="text-gray-600 dark:text-gray-300"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="bg-gray-50 dark:bg-gray-900">
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <!-- Camera System Status -->
+    <div class="mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white truncate">Camera System Status</h2>
+        <ion-button
+          fill="clear"
+          size="small"
+          (click)="refreshCameraInfo()"
+          [disabled]="isLoading"
+          class="flex-shrink-0 ml-2">
+          <ion-icon
+            slot="start"
+            [class.animate-spin]="isLoading"
+            name="refresh"></ion-icon>
+          {{ isLoading ? 'Checking...' : 'Refresh' }}
+        </ion-button>
+      </div>
+
+      <!-- Loading State -->
+      <div
+        *ngIf="isLoading"
+        class="bg-white dark:bg-gray-800 rounded-lg p-8">
+        <div class="flex flex-col items-center justify-center">
+          <ion-spinner class="mb-4"></ion-spinner>
+          <p class="text-gray-600 dark:text-gray-300">Checking camera system...</p>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div
+        *ngIf="!isLoading && hasError"
+        class="bg-white dark:bg-gray-800 rounded-lg overflow-hidden">
+        <div class="p-4 bg-red-50 dark:bg-red-900/20 border-b border-red-100 dark:border-red-800">
+          <div class="flex items-start space-x-3">
+            <div class="flex-shrink-0">
+              <ion-icon
+                name="alert-circle"
+                class="text-2xl text-red-500 dark:text-red-400"></ion-icon>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h3 class="text-lg font-medium text-red-800 dark:text-red-200">Camera System Error</h3>
+              <p class="mt-1 text-red-700 dark:text-red-300">{{ errorMessage }}</p>
+            </div>
+          </div>
+          <div class="mt-4 flex space-x-3">
+            <ion-button
+              color="danger"
+              (click)="goToDeviceCheck()">
+              <ion-icon
+                name="diagnostic"
+                slot="start"></ion-icon>
+              Run Device Check
+            </ion-button>
+            <ion-button
+              fill="outline"
+              color="danger"
+              (click)="refreshCameraInfo()">
+              <ion-icon
+                name="refresh"
+                slot="start"></ion-icon>
+              Try Again
+            </ion-button>
+          </div>
+        </div>
+      </div>
+
+      <!-- No Devices Found -->
+      <div
+        *ngIf="!isLoading && !hasError && noDevicesFound"
+        class="bg-white dark:bg-gray-800 rounded-lg overflow-hidden">
+        <div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-100 dark:border-yellow-800">
+          <div class="flex items-start space-x-3">
+            <div class="flex-shrink-0">
+              <ion-icon
+                name="warning"
+                class="text-2xl text-yellow-500 dark:text-yellow-400"></ion-icon>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h3 class="text-lg font-medium text-yellow-800 dark:text-yellow-200">No Camera Devices Found</h3>
+              <p class="mt-1 text-yellow-700 dark:text-yellow-300">
+                Please ensure your camera is properly connected and not in use by another application.
+              </p>
+              <ul class="mt-2 text-sm text-yellow-600 dark:text-yellow-400 space-y-1">
+                <li class="flex items-center">
+                  <ion-icon
+                    name="checkmark-circle"
+                    class="mr-2"></ion-icon>
+                  Check if camera is connected
+                </li>
+                <li class="flex items-center">
+                  <ion-icon
+                    name="checkmark-circle"
+                    class="mr-2"></ion-icon>
+                  Close other applications using the camera
+                </li>
+                <li class="flex items-center">
+                  <ion-icon
+                    name="checkmark-circle"
+                    class="mr-2"></ion-icon>
+                  Try reconnecting your camera
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="mt-4 flex space-x-3">
+            <ion-button
+              color="warning"
+              (click)="refreshCameraInfo()">
+              <ion-icon
+                name="refresh"
+                slot="start"></ion-icon>
+              Check Again
+            </ion-button>
+            <ion-button
+              fill="outline"
+              color="warning"
+              (click)="goToDeviceCheck()">
+              <ion-icon
+                name="diagnostic"
+                slot="start"></ion-icon>
+              Run Diagnostics
+            </ion-button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Camera Info -->
+      <ng-container *ngIf="!isLoading && !hasError && !noDevicesFound && cameraCapability">
+        <!-- Support Status -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg mb-4">
+          <div class="p-4">
+            <div class="flex items-center space-x-2">
+              <div
+                [class]="cameraCapability.isSupported ? 'text-green-500' : 'text-red-500'"
+                class="flex-shrink-0">
+                <ion-icon
+                  [name]="cameraCapability.isSupported ? 'checkmark-circle' : 'close-circle'"
+                  class="text-xl"></ion-icon>
+              </div>
+              <span class="text-gray-900 dark:text-white font-medium truncate">
+                Camera System {{ cameraCapability.isSupported ? 'Supported' : 'Not Supported' }}
+              </span>
+            </div>
+            <p
+              *ngIf="cameraCapability.errorMessage"
+              class="mt-2 text-sm text-red-500 break-words">
+              {{ cameraCapability.errorMessage }}
+            </p>
+          </div>
+        </div>
+
+        <div *ngFor="let device of cameraCapability.availableDevices">
+          <!-- Available Devices -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg my-4">
+            <div class="p-4">
+              <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-3 truncate">Available Cameras</h3>
+              <div class="space-y-3">
+                <div class="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <ion-icon
+                    name="camera"
+                    class="text-gray-500 dark:text-gray-400 flex-shrink-0 mt-0.5"></ion-icon>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {{ device.label || 'Unnamed Camera' }}
+                    </p>
+                    <p
+                      class="text-xs text-gray-500 dark:text-gray-400 truncate"
+                      [title]="device.deviceId">
+                      ID: {{ device.deviceId }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Supported Resolutions -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg">
+            <div class="p-4">
+              <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-3 truncate">Supported Resolutions</h3>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div
+                  *ngFor="let resolution of cameraCapability.supportedResolutions"
+                  class="flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  [title]="getResolutionTooltip(resolution)">
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {{ RESOLUTION_SPECS[resolution].name }}
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {{ RESOLUTION_SPECS[resolution].width }}x{{ RESOLUTION_SPECS[resolution].height }}
+                    </p>
+                  </div>
+                  <ion-icon
+                    name="checkmark-circle"
+                    class="text-green-500 ml-2 flex-shrink-0"></ion-icon>
+                </div>
+              </div>
+
+              <!-- Recommended Resolution -->
+              <div
+                *ngIf="cameraCapability.recommendedResolution"
+                class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div class="flex items-start space-x-2">
+                  <ion-icon
+                    name="star"
+                    class="text-blue-500 flex-shrink-0 mt-0.5"></ion-icon>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-blue-900 dark:text-blue-100 truncate">Recommended Resolution</p>
+                    <p
+                      class="text-xs text-blue-700 dark:text-blue-300 truncate"
+                      [title]="getResolutionTooltip(cameraCapability.recommendedResolution)">
+                      {{ RESOLUTION_SPECS[cameraCapability.recommendedResolution].name }} ({{
+                      RESOLUTION_SPECS[cameraCapability.recommendedResolution].width }}x{{
+                      RESOLUTION_SPECS[cameraCapability.recommendedResolution].height }})
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+
+    <!-- Feature Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Camera Test Card -->
+      <ion-card
+        class="m-0 bg-white dark:bg-gray-800 transform transition-all duration-300 hover:scale-105 hover:shadow-lg dark:shadow-gray-900/50">
+        <ion-card-content class="p-0">
+          <div class="flex items-start p-4 space-x-4">
+            <div
+              class="w-12 h-12 rounded-lg bg-blue-500 dark:bg-blue-600 flex items-center justify-center flex-shrink-0">
+              <ion-icon
+                name="camera"
+                class="text-2xl text-white"></ion-icon>
+            </div>
+            <div class="flex-grow">
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">Camera Test</h2>
+              <p class="text-gray-600 dark:text-gray-300 text-sm mb-3">Test your device camera and capture quality</p>
+              <ion-button
+                expand="block"
+                class="h-10 font-medium"
+                color="primary"
+                [routerLink]="['/camera-test']"
+                [disabled]="!cameraCapability?.isSupported || noDevicesFound">
+                Start Test
+              </ion-button>
+            </div>
+          </div>
+        </ion-card-content>
+      </ion-card>
+
+      <!-- ID Card Front Card -->
+      <ion-card
+        class="m-0 bg-white dark:bg-gray-800 transform transition-all duration-300 hover:scale-105 hover:shadow-lg dark:shadow-gray-900/50">
+        <ion-card-content class="p-0">
+          <div class="flex items-start p-4 space-x-4">
+            <div
+              class="w-12 h-12 rounded-lg bg-green-500 dark:bg-green-600 flex items-center justify-center flex-shrink-0">
+              <ion-icon
+                name="card"
+                class="text-2xl text-white"></ion-icon>
+            </div>
+            <div class="flex-grow">
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">ID Card Front</h2>
+              <p class="text-gray-600 dark:text-gray-300 text-sm mb-3">Scan and extract data from ID card front</p>
+              <ion-button
+                expand="block"
+                color="success"
+                class="h-10 font-medium"
+                [routerLink]="['/id-card-front']"
+                [disabled]="!cameraCapability?.isSupported || noDevicesFound">
+                Start Scan
+              </ion-button>
+            </div>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    </div>
+
+    <!-- Quick Tips Section -->
+    <div class="mt-8 bg-blue-50 dark:bg-gray-800/50 rounded-xl p-6">
+      <div class="flex items-start space-x-4">
+        <div class="w-10 h-10 rounded-lg bg-blue-500 dark:bg-blue-600 flex items-center justify-center flex-shrink-0">
+          <ion-icon
+            name="information-circle"
+            class="text-xl text-white"></ion-icon>
+        </div>
+        <div>
+          <h3 class="text-lg font-medium text-blue-900 dark:text-blue-100">Quick Tips</h3>
+          <ul class="mt-2 text-sm text-blue-800 dark:text-blue-200 space-y-1">
+            <li>• Enable camera permissions when prompted</li>
+            <li>• Use recommended resolution for optimal performance</li>
+            <li>• Good lighting improves capture quality</li>
+            <li>• Keep device steady during capture</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</ion-content>

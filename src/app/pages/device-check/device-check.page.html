@@ -1,0 +1,81 @@
+<ion-content class="bg-gray-50 dark:bg-gray-900">
+  <div class="max-w-2xl mx-auto p-6">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Device Check</h1>
+      <p class="text-gray-600 dark:text-gray-300">Verifying your device compatibility</p>
+    </div>
+
+    <!-- Checklist -->
+    <div class="space-y-4">
+      <div
+        *ngFor="let check of checks$ | async"
+        class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow transition-all duration-300"
+        [ngClass]="{
+             'border-l-4': true,
+             'border-gray-300': check.status === 'pending',
+             'border-blue-500 animate-pulse': check.status === 'checking',
+             'border-green-500': check.status === 'success',
+             'border-red-500': check.status === 'error'
+           }">
+        <div class="flex items-center">
+          <!-- Status Icon -->
+          <div class="flex-shrink-0 w-8 h-8 mr-4">
+            <ion-icon
+              [name]="getStatusIcon(check.status)"
+              class="text-2xl"
+              [ngClass]="{
+                'text-gray-400': check.status === 'pending',
+                'text-blue-500': check.status === 'checking',
+                'text-green-500': check.status === 'success',
+                'text-red-500': check.status === 'error'
+              }"></ion-icon>
+          </div>
+
+          <!-- Check Info -->
+          <div class="flex-grow">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white">{{ check.name }}</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-300">{{ check.description }}</p>
+            <p
+              *ngIf="check.errorMessage"
+              class="text-sm text-red-500 mt-1">
+              {{ check.errorMessage }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="mt-8 space-y-4">
+      <ion-button
+        *ngIf="!isChecking && !allChecksPassed"
+        expand="block"
+        (click)="startChecks()"
+        class="h-12">
+        Start Device Check
+      </ion-button>
+
+      <ion-button
+        *ngIf="allChecksPassed"
+        expand="block"
+        color="success"
+        (click)="goToHome()"
+        class="h-12">
+        Continue to App
+        <ion-icon
+          name="arrow-forward"
+          slot="end"></ion-icon>
+      </ion-button>
+
+      <ion-button
+        *ngIf="!isChecking && hasErrors"
+        expand="block"
+        color="medium"
+        (click)="startChecks()"
+        class="h-12">
+        Retry Check
+      </ion-button>
+    </div>
+  </div>
+</ion-content>

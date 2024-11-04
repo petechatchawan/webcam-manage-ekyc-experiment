@@ -1,0 +1,39 @@
+<ion-content class="ion-no-padding">
+  <div class="relative h-full bg-black">
+    <!-- Preview Image -->
+    <img
+      [src]="'data:image/jpeg;base64,' + imageData"
+      class="w-full h-full object-contain"
+      *ngIf="imageData" />
+
+    <!-- Controls -->
+    <div class="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-black/50 to-transparent">
+      <div class="flex justify-between items-center">
+        <ion-button
+          (click)="dismiss(false)"
+          fill="clear"
+          color="danger">
+          <ion-icon
+            slot="start"
+            name="close"></ion-icon>
+          Discard
+        </ion-button>
+        <ion-button
+          (click)="dismiss(true)"
+          color="success">
+          <ion-icon
+            slot="start"
+            name="save"></ion-icon>
+          Save
+        </ion-button>
+      </div>
+    </div>
+
+    <!-- Timestamp -->
+    <div class="absolute top-4 right-4 bg-black/50 px-3 py-1 rounded-full">
+      <span class="text-sm text-white">
+        {{ timestamp | date : 'medium' }}
+      </span>
+    </div>
+  </div>
+</ion-content>
