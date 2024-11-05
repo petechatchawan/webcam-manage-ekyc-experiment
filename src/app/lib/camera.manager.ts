@@ -1,36 +1,27 @@
 import { BehaviorSubject } from "rxjs";
 import { UAInfo } from "./ua-info";
 import { STANDARD_RESOLUTIONS } from "./constants/resolution.preset";
-import { Resolution } from "./types/resolution.types";
+import { Resolution, ResolutionOrientationSupport, SupportedResolutions, VideoResolutionPreset } from "./types/resolution.types";
 import { EventEmitter } from "@angular/core";
 
 // ================== Types & Interfaces ==================
-export interface CameraConfig {
-    videoElement?: HTMLVideoElement | null;
-    canvasElement?: HTMLCanvasElement | null;
-    enableAudio?: boolean;
+interface CameraConfiguration {
+    videoElement?: HTMLVideoElement;
+    canvasElement?: HTMLCanvasElement;
     selectedDevice?: MediaDeviceInfo;
     facingMode?: FacingMode;
     resolution?: Resolution;
     fallbackResolution?: Resolution;
+    enableAudio?: boolean;
+    // เพิ่ม options สำหรับ orientation
+    // orientationMode?: 'auto' | 'manual' | 'swap';  // default: 'manual'
+    autoSwapResolution?: boolean;  // สำหรับ backward compatibility
     mirror?: boolean;
-    autoSwapResolution?: boolean;
 }
 
 export enum FacingMode {
     Front = 'user',
     Back = 'environment',
-}
-
-export enum VideoResolutionPreset {
-    SD = 'SD',       // 480p
-    HD = 'HD',       // 720p
-    FHD = 'FHD',     // 1080p
-    QHD = 'QHD',     // 1440p
-    UHD = 'UHD',     // 2160p (4K)
-    SQUARE_HD = 'SQUARE_HD', // 720x720
-    SQUARE_FHD = 'SQUARE_FHD', // 1080x1080
-
 }
 
 export enum ImageFormat {
@@ -51,14 +42,6 @@ export interface CapturedImage {
     height: number;
     uri: string;
     base64?: string;
-}
-
-// ปรับปรุง interface เพื่อรองรับ deviceId ในผลลัพธ์
-interface SupportedResolutions {
-    preset: VideoResolutionPreset;
-    supported: boolean;
-    spec: Resolution;
-    deviceId: string;
 }
 
 export enum CameraErrorCode {
@@ -152,7 +135,7 @@ export class CameraManager {
     private currentStream: MediaStream | null = null;
     private currentCameraDevice: MediaDeviceInfo | null = null;
     private currentResolution: Resolution | null = { width: 0, height: 0, aspectRatio: 0, name: '' };
-    private currentCameraConfig: CameraConfig = {
+    private currentCameraConfig: CameraConfiguration = {
         resolution: { width: 1280, height: 720, aspectRatio: 16 / 9, name: '720p' },
         enableAudio: false,
         mirror: true,
@@ -290,23 +273,15 @@ export class CameraManager {
                 throw new Error('No camera devices found');
             }
 
-            const devicesToCheck = deviceId ?
-                [{ deviceId }] :
-                devices;
-
+            const devicesToCheck = deviceId ? [{ deviceId }] : devices;
             const allResults: SupportedResolutions[] = [];
+
             for (const device of devicesToCheck) {
                 try {
-                    // เปิดกล้องครั้งเดียวด้วยความละเอียดสูงสุด
-                    const stream = await this.getUserMedia({
-                        video: {
-                            deviceId: { exact: device.deviceId },
-                            width: { ideal: 3840 }, // 4K width
-                            height: { ideal: 2160 } // 4K height
-                        }
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { deviceId: { exact: deviceId } },
                     });
 
-                    // ตรวจสอบว่า stream ไม่เป็น null
                     if (!stream) {
                         throw new Error('Failed to get media stream');
                     }
@@ -315,53 +290,37 @@ export class CameraManager {
                     const capabilities = track.getCapabilities();
                     const results: SupportedResolutions[] = [];
 
-                    // ตรวจสอบว่ามี capabilities ที่จำเป็นครบถ้วน
-                    if (!capabilities.width || !capabilities.height ||
-                        typeof capabilities.width.min === 'undefined' ||
-                        typeof capabilities.width.max === 'undefined' ||
-                        typeof capabilities.height.min === 'undefined' ||
-                        typeof capabilities.height.max === 'undefined') {
+                    if (!this.hasValidCapabilities(capabilities)) {
                         throw new Error('Device capabilities not available');
                     }
 
-                    // ตรวจสอบทุกความละเอียดที่ต้องการ
+                    // ตรวจสอบทุกความละเอียดทั้งแนวตั้งและแนวนอน
                     for (const preset of Object.values(VideoResolutionPreset)) {
                         const spec = STANDARD_RESOLUTIONS[preset];
-
-                        // เช็คว่าความละเอียดอยู่ในช่วงที่กล้องรองรับหรือไม่
-                        const supported: boolean =
-                            spec.width >= capabilities.width.min &&
-                            spec.width <= capabilities.width.max &&
-                            spec.height >= capabilities.height.min &&
-                            spec.height <= capabilities.height.max;
+                        const supportedOrientations = this.checkOrientationSupport(
+                            capabilities,
+                            spec
+                        );
 
                         results.push({
                             preset: preset,
-                            supported: supported,
+                            supported: supportedOrientations.landscape || supportedOrientations.portrait,
+                            supportedOrientations, // เพิ่มข้อมูลว่าแนวไหนใช้ได้บ้าง
                             spec: spec,
                             deviceId: device.deviceId
                         });
                     }
 
-                    // ปิดกล้องหลังจากตรวจสอบเสร็จ
                     track.stop();
+                    stream.getTracks().forEach((track) => track.stop());
                     allResults.push(...results);
-
                 } catch (error) {
                     console.warn(`Failed to check device ${device.deviceId}:`, error);
-                    // กรณี device ไม่สามารถตรวจสอบได้ ให้ mark ทุก resolution เป็น false
-                    const fallbackResults = Object.values(VideoResolutionPreset).map(preset => ({
-                        preset: preset,
-                        supported: false,
-                        spec: STANDARD_RESOLUTIONS[preset],
-                        deviceId: device.deviceId
-                    }));
+                    const fallbackResults = this.createFallbackResults(device.deviceId);
                     allResults.push(...fallbackResults);
                 }
             }
 
-            // ถ้าระบุ deviceId มาให้ return เฉพาะผลของ device นั้น
-            // ถ้าไม่ได้ระบุให้ return ผลของทุก device
             return deviceId ?
                 allResults.filter(result => result.deviceId === deviceId) :
                 allResults;
@@ -373,6 +332,52 @@ export class CameraManager {
                 error
             );
         }
+    }
+
+    private hasValidCapabilities(capabilities: MediaTrackCapabilities): boolean {
+        return !!(
+            capabilities.width?.min !== undefined &&
+            capabilities.width?.max !== undefined &&
+            capabilities.height?.min !== undefined &&
+            capabilities.height?.max !== undefined
+        );
+    }
+
+    private checkOrientationSupport(
+        capabilities: MediaTrackCapabilities,
+        resolution: Resolution
+    ): ResolutionOrientationSupport {
+        // แนวนอน (landscape)
+        const { width, height } = capabilities;
+        console.log(`Found capabilities: width=${width}, height=${height}`);
+
+        const landscapeSupported =
+            resolution.width >= (width?.min ?? 0) &&
+            resolution.width <= (width?.max ?? Infinity) &&
+            resolution.height >= (height?.min ?? 0) &&
+            resolution.height <= (height?.max ?? Infinity)
+
+        // แนวตั้ง (portrait) - สลับ width และ height
+        const portraitSupported =
+            resolution.height >= (width?.min ?? 0) &&
+            resolution.height <= (width?.max ?? Infinity) &&
+            resolution.width >= (height?.min ?? 0) &&
+            resolution.width <= (height?.max ?? Infinity)
+
+        return {
+            landscape: landscapeSupported,
+            portrait: portraitSupported
+        };
+    }
+
+    private createFallbackResults(deviceId: string): SupportedResolutions[] {
+        return Object.values(VideoResolutionPreset).map(preset => ({
+            preset: preset,
+            supported: false,
+            supportedOrientations: { landscape: false, portrait: false },
+            spec: STANDARD_RESOLUTIONS[preset],
+            deviceId: deviceId
+        }));
     }
 
     /**
@@ -505,15 +510,14 @@ export class CameraManager {
     }
 
     /**
-   * อัพเดทการตั้งค่ากล้องและนำไปใช้
-   * @param newConfig การตั้งค่าใหม่ที่ต้องการ
-   * @param forceRestart บังคับให้รีสตาร์ทกล้องหรือไม่
-   */
-    public async applyConfigChanges(newConfig: Partial<CameraConfig>, forceRestart: boolean = false): Promise<void> {
+     * อัพเดทการตั้งค่ากล้องและนำไปใช้
+     * @param newConfig การตั้งค่าใหม่ที่ต้องการ
+     * @param forceRestart บังคับให้รีสตาร์ทกล้องหรือไม่
+     */
+    public async applyConfigChanges(newConfig: Partial<CameraConfiguration>, forceRestart: boolean = false): Promise<void> {
+        console.log('Applying config changes:', newConfig);
         try {
             const prevConfig = { ...this.currentCameraConfig };
-
-            // ตรวจสอบการเปลี่ยนแปลงที่สำคัญ
             const isDeviceChanged = newConfig.selectedDevice?.deviceId !== this.currentCameraConfig.selectedDevice?.deviceId;
             const isFacingModeChanged = newConfig.facingMode !== this.currentCameraConfig.facingMode;
             const isResolutionChanged = newConfig.resolution && (
@@ -521,56 +525,65 @@ export class CameraManager {
                 newConfig.resolution.height !== this.currentCameraConfig.resolution?.height
             );
 
-            // อัพเดทการตั้งค่า
+            console.log('Previous config:', prevConfig);
+            console.log('Device changed:', isDeviceChanged);
+            console.log('Facing mode changed:', isFacingModeChanged);
+            console.log('Resolution changed:', isResolutionChanged);
+
             this.currentCameraConfig = {
                 ...this.currentCameraConfig,
                 ...newConfig
             };
 
-            // ถ้ายังไม่ได้เริ่มกล้องหรือไม่มี video element
             if (!this.currentStream || !this.currentCameraConfig.videoElement) {
+                console.log('Starting camera as it has not been started yet');
                 await this.startCamera();
                 return;
             }
 
-            // ถ้ามีการเปลี่ยนแปลงสำคัญหรือต้องการ force restart
             if (isDeviceChanged || isFacingModeChanged || isResolutionChanged || forceRestart) {
+                console.log('Restarting camera due to significant changes or forced restart');
                 await this.restartCamera();
                 return;
             }
 
-            // ถ้ามีการเปลี่ยนแปลงที่ไม่ต้อง restart
             const track = this.currentStream.getVideoTracks()[0];
             if (!track) {
+                console.error('No video track found in camera stream');
                 throw this.createError(
                     CameraErrorCode.TRACK_NOT_FOUND,
                     'No video track found in camera stream'
                 );
             }
 
-            // อัพเดท constraints ถ้าจำเป็น
             const currentSettings = track.getSettings();
             const newConstraints = this.createConstraints();
             const needsUpdate = this.hasSettingsChanged(currentSettings, newConstraints.video as MediaTrackConstraints);
 
+            console.log('Current track settings:', currentSettings);
+            console.log('New constraints:', newConstraints);
+            console.log('Needs update:', needsUpdate);
+
             if (needsUpdate) {
                 try {
+                    console.log('Applying new constraints to track');
                     await track.applyConstraints(newConstraints.video as MediaTrackConstraints);
-                    // อัพเดท metrics
                     this.metrics.resolutionChanges++;
+                    console.log('Constraints applied successfully');
                 } catch (error) {
-                    // ถ้าไม่สามารถใช้การตั้งค่าใหม่ได้ ให้กลับไปใช้การตั้งค่าเดิม
+                    console.error('Failed to apply new constraints:', error);
                     this.currentCameraConfig = prevConfig;
                     throw error;
                 }
             }
 
-            // อัพเดทการตั้งค่าอื่นๆ ที่ไม่ต้องใช้ constraints
             if (this.currentCameraConfig.mirror !== prevConfig.mirror) {
+                console.log('Applying mirror effect');
                 this.applyMirrorEffect();
             }
 
         } catch (error: any) {
+            console.error('Error applying camera configuration changes:', error);
             this.emitError('ERROR', this.createError(
                 CameraErrorCode.APPLY_CONSTRAINTS_ERROR,
                 'Failed to apply camera configuration changes',
@@ -656,10 +669,15 @@ export class CameraManager {
     }
 
     private createConstraints(): MediaStreamConstraints {
-        const resolution = this.currentCameraConfig.resolution ?? { width: 1280, height: 720, aspectRatio: 16 / 9, name: '720p' };
-        const autoSwapResolution = this.currentCameraConfig.autoSwapResolution ?? false;
-        const { width, height } = this.getFinalResolution(resolution, autoSwapResolution);
+        const resolution = this.currentCameraConfig.resolution ?? {
+            width: 1280,
+            height: 720,
+            aspectRatio: 16 / 9,
+            name: '720p'
+        };
 
+        const autoSwapResolution = this.currentCameraConfig.autoSwapResolution ?? false;
+        const finalResolution = this.getFinalResolution(resolution, autoSwapResolution);
         const videoConstraints: MediaTrackConstraints = {
             deviceId: this.currentCameraConfig.selectedDevice?.deviceId
                 ? { exact: this.currentCameraConfig.selectedDevice.deviceId }
@@ -667,9 +685,9 @@ export class CameraManager {
             facingMode: this.currentCameraConfig.selectedDevice?.deviceId
                 ? undefined
                 : this.currentCameraConfig.facingMode,
-            width: { exact: width },
-            height: { exact: height },
-            aspectRatio: { ideal: width / height }
+            width: { exact: finalResolution.width },
+            height: { exact: finalResolution.height },
+            aspectRatio: { ideal: finalResolution.aspectRatio }
         };
 
         if (videoConstraints.facingMode === undefined) {
@@ -685,14 +703,18 @@ export class CameraManager {
     private getFinalResolution(resolution: Resolution, autoSwapResolution: boolean): Resolution {
         const isMobile = this.uaParser.isMobile() || this.uaParser.isTablet();
         if (autoSwapResolution && isMobile) {
-            return {
-                width: resolution.height,
-                height: resolution.width,
-                aspectRatio: resolution.aspectRatio,
-                name: resolution.name
-            };
+            return this.swapDimensions(resolution);
         }
         return resolution;
+    }
+
+    private swapDimensions(resolution: Resolution): Resolution {
+        return {
+            width: resolution.height,
+            height: resolution.width,
+            aspectRatio: 1 / resolution.aspectRatio,
+            name: resolution.name
+        };
     }
 
     private async waitForVideoLoad(): Promise<void> {
@@ -770,7 +792,7 @@ export class CameraManager {
         this.setCurrentCameraDevice(selectedCamera ?? null);
 
         // อัปเดต config ให้ตรงกับค่าจริง
-        const updatedConfig: CameraConfig = {
+        const updatedConfig: CameraConfiguration = {
             ...this.currentCameraConfig,
             resolution: actualResolution,
             selectedDevice: selectedCamera ?? undefined,
@@ -819,10 +841,7 @@ export class CameraManager {
     // Helper method สำหรับระบุชื่อความละเอียด
     private getResolutionName(width: number, height: number): string {
         // ตรวจสอบว่าตรงกับ preset ไหม
-        const matchingPreset = Object.values(STANDARD_RESOLUTIONS).find(
-            spec => spec.width === width && spec.height === height
-        );
-
+        const matchingPreset = Object.values(STANDARD_RESOLUTIONS).find(spec => spec.width === width && spec.height === height);
         if (matchingPreset) {
             return matchingPreset.name;
         }
@@ -919,7 +938,7 @@ export class CameraManager {
         this.currentStream = stream;
     }
 
-    public setCurrentCameraConfiguration(config: CameraConfig): void {
+    public setCurrentCameraConfiguration(config: CameraConfiguration): void {
         this.currentCameraConfig = config;
     }
 
@@ -939,7 +958,7 @@ export class CameraManager {
         return this.capturedImage;
     }
 
-    public getCurrentCameraConfig(): CameraConfig {
+    public getCurrentCameraConfig(): CameraConfiguration {
         return this.currentCameraConfig;
     }
 
@@ -1052,13 +1071,21 @@ export class CameraManager {
     // ================== Check Resolution Availability Methods ==================
     private capabilitySubject = new BehaviorSubject<CameraCapability | null>(null);
     public capability$ = this.capabilitySubject.asObservable();
+    private capabilitiesChecked = false;
 
     public getCapabilities(): CameraCapability | null {
         return this.capabilitySubject.getValue();
     }
 
-
+    /**
+       * ตรวจสอบความสามารถของกล้องครั้งแรกครั้งเดียว
+       */
     public async checkCameraCapabilities(): Promise<boolean> {
+        // ถ้าเคยตรวจสอบแล้ว ให้ใช้ค่าที่มีอยู่
+        if (this.capabilitiesChecked) {
+            return this.capabilitySubject.value?.isSupported ?? false;
+        }
+
         try {
             if (!this.isCameraAccessSupported()) {
                 throw new Error('Camera API not supported');
@@ -1074,30 +1101,76 @@ export class CameraManager {
                 throw new Error('No camera devices found');
             }
 
-            const defaultDevice = devices[0];
-            const supportedResolutions = await this.checkSupportedResolutions(defaultDevice.deviceId);
-            const availableResolutions = supportedResolutions
-                .filter(res => res.supported)
-                .map(res => res.preset);
+            // เช็คความละเอียดที่รองรับสำหรับทุกกล้อง
+            const deviceCapabilities = await Promise.all(
+                devices.map(async (device) => {
+                    try {
+                        const supportedResolutions = await this.checkSupportedResolutions(device.deviceId);
 
-            if (availableResolutions.length === 0) {
-                throw new Error('No supported resolutions found');
+                        // กรองเฉพาะความละเอียดที่รองรับจริงๆ (ทั้งแนวตั้งและแนวนอน)
+                        const availableResolutions = supportedResolutions
+                            .filter(res => res.supportedOrientations.landscape || res.supportedOrientations.portrait)
+                            .map(res => ({
+                                preset: res.preset,
+                                orientations: res.supportedOrientations
+                            }));
+
+                        // หาความละเอียดที่แนะนำสำหรับกล้องนี้
+                        const recommendedResolution = availableResolutions.find(
+                            res => res.preset === VideoResolutionPreset.HD
+                        )?.preset || availableResolutions[0]?.preset;
+
+                        return {
+                            device,
+                            isSupported: availableResolutions.length > 0,
+                            supportedResolutions: availableResolutions,
+                            recommendedResolution,
+                        };
+                    } catch (error) {
+                        return {
+                            device,
+                            isSupported: false,
+                            supportedResolutions: [],
+                            recommendedResolution: undefined,
+                            error: error instanceof Error ? error.message : 'Unknown error'
+                        };
+                    }
+                })
+            );
+
+            // กรองเอาเฉพาะกล้องที่รองรับ
+            const supportedDevices = deviceCapabilities.filter(cap => cap.isSupported);
+
+            if (supportedDevices.length === 0) {
+                throw new Error('No supported camera devices found');
             }
 
-            const recommendedResolution = availableResolutions.includes(VideoResolutionPreset.HD)
-                ? VideoResolutionPreset.HD
-                : availableResolutions[0];
+            // ใช้กล้องแรกเป็น default
+            const defaultDeviceCapability = supportedDevices[0];
 
             const capabilities: CameraCapability = {
                 isSupported: true,
                 hasMultipleCameras: devices.length > 1,
                 availableDevices: devices,
-                supportedResolutions: availableResolutions,
-                defaultDevice: defaultDevice,
-                recommendedResolution: recommendedResolution
+                // เก็บข้อมูลความละเอียดของแต่ละกล้อง
+                deviceResolutions: deviceCapabilities.reduce((acc, curr) => ({
+                    ...acc,
+                    [curr.device.deviceId]: {
+                        supportedResolutions: curr.supportedResolutions,
+                        recommendedResolution: curr.recommendedResolution,
+                        isSupported: curr.isSupported,
+                        error: curr.error
+                    }
+                }), {}),
+                // ใช้ความละเอียดของกล้องแรกเป็นค่าเริ่มต้น
+                supportedResolutions: defaultDeviceCapability.supportedResolutions,
+                defaultDevice: defaultDeviceCapability.device,
+                recommendedResolution: defaultDeviceCapability.recommendedResolution,
             };
 
             this.capabilitySubject.next(capabilities);
+            this.capabilitiesChecked = true;
+
             return true;
 
         } catch (error: any) {
@@ -1106,12 +1179,29 @@ export class CameraManager {
                 hasMultipleCameras: false,
                 availableDevices: [],
                 supportedResolutions: [],
-                errorMessage: error.message
+                deviceResolutions: {},
+                errorMessage: error.message,
             };
 
             this.capabilitySubject.next(failedCapability);
+            this.capabilitiesChecked = true;
+
             return false;
         }
+    }
+
+    /**
+     * ดึงความละเอียดที่รองรับสำหรับ orientation ที่ระบุ
+     */
+    public getSupportedResolutionsForOrientation(
+        orientation: 'portrait' | 'landscape'
+    ): VideoResolutionPreset[] {
+        const capabilities = this.getCapabilities();
+        if (!capabilities?.supportedResolutions) return [];
+
+        return capabilities.supportedResolutions
+            .filter(res => res.orientations[orientation])
+            .map(res => res.preset);
     }
 }
 
@@ -1119,7 +1209,27 @@ export interface CameraCapability {
     isSupported: boolean;
     hasMultipleCameras: boolean;
     availableDevices: MediaDeviceInfo[];
-    supportedResolutions: VideoResolutionPreset[];
+    supportedResolutions: {
+        preset: VideoResolutionPreset;
+        orientations: {
+            portrait: boolean;
+            landscape: boolean;
+        };
+    }[];
+    deviceResolutions: {
+        [deviceId: string]: {
+            supportedResolutions: {
+                preset: VideoResolutionPreset;
+                orientations: {
+                    portrait: boolean;
+                    landscape: boolean;
+                };
+            }[];
+            recommendedResolution: VideoResolutionPreset | null;
+            isSupported: boolean;
+            error?: string;
+        };
+    };
     defaultDevice?: MediaDeviceInfo;
     recommendedResolution?: VideoResolutionPreset;
     errorMessage?: string;

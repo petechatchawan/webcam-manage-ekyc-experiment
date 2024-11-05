@@ -27,11 +27,8 @@ export class CameraDeviceSelector {
   }
 
   /**
-   *
-   * Select camera
-   *
-   * */
-  // Main method to select camera based on device type
+   * Selects a camera device based on preferred facing mode and device capabilities.
+   */
   public async selectCamera(
     videoDevices: MediaDeviceInfo[],
     preferredFacingMode: FacingMode
@@ -41,7 +38,7 @@ export class CameraDeviceSelector {
         let facingMode: FacingMode = FacingMode.Front;
         try {
           const capabilities = (device as InputDeviceInfo).getCapabilities();
-          if (capabilities.facingMode && capabilities.facingMode.length > 0) {
+          if (capabilities.facingMode?.length) {
             facingMode = capabilities.facingMode[0] as FacingMode;
           }
         } catch (error) {
@@ -53,7 +50,6 @@ export class CameraDeviceSelector {
         const deviceIndex = isMobile && isAndroid ? this.parseAndroidDeviceIndex(device.label) : index;
 
         return {
-          ...device,
           label: device.label || '',
           deviceId: device.deviceId,
           index: deviceIndex,
@@ -65,8 +61,8 @@ export class CameraDeviceSelector {
     const cameraDevice = this.uaParser.isDesktop()
       ? this.selectDesktopCamera()
       : this.selectMobileCamera(preferredFacingMode);
-    const finalCamera = videoDevices.find(device => device.deviceId === cameraDevice?.deviceId);
-    return finalCamera || null;
+
+    return videoDevices.find(device => device.deviceId === cameraDevice?.deviceId) || null;
   }
 
   private parseAndroidDeviceIndex = (label: string): number => {

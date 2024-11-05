@@ -1,4 +1,4 @@
-import { Resolution, VideoResolutionPreset } from "../types/resolution.types";
+import { VideoResolutionPreset, Resolution } from "../types/resolution.types";
 
 export const STANDARD_RESOLUTIONS: { [key in VideoResolutionPreset]: Resolution } = {
     [VideoResolutionPreset.SD]: {

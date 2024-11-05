@@ -1,10 +1,12 @@
 import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { ActionSheetController, IonContent, ModalController, NavController, Platform, ToastController } from '@ionic/angular';
+import { IonContent, ModalController, NavController, Platform, ToastController } from '@ionic/angular';
 import { Subscription, fromEvent } from 'rxjs';
 import { ImagePreviewComponent } from 'src/app/components/image-preview/image-preview.component';
-import { CameraErrorCode, CameraManager, FacingMode, ImageFormat, VideoResolutionPreset } from 'src/app/lib/camera.manager';
+import { ResolutionPickerComponent } from 'src/app/components/resolution-picker/resolution-picker.component';
+import { CameraErrorCode, CameraManager, FacingMode, ImageFormat } from 'src/app/lib/camera.manager';
 import { STANDARD_RESOLUTIONS } from 'src/app/lib/constants/resolution.preset';
-import { Resolution } from 'src/app/lib/types/resolution.types';
+import { Resolution, SupportedResolutions, VideoResolutionPreset } from 'src/app/lib/types/resolution.types';
+import { UAInfo } from 'src/app/lib/ua-info';
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
@@ -25,9 +27,11 @@ export class CameraTestPage implements OnInit, OnDestroy, AfterViewInit {
   isCameraReady = false;
   isCapturing = false;
   hasMultipleCameras = false;  // สถานะว่ามีกล้องหลายตัวหรือไม่
+  supportedResolutions: SupportedResolutions[] = [];
   currentFacingMode = FacingMode.Front;
   currentDevice: MediaDeviceInfo | null = null;
   currentResolution: Resolution | null = null;
+  currentOrientation: 'portrait' | 'landscape' = 'portrait';
   metrics = {
     frameRate: 0,
     startupTime: 0
@@ -36,20 +40,23 @@ export class CameraTestPage implements OnInit, OnDestroy, AfterViewInit {
   constructor(
     public themeService: ThemeService,
     private cameraManager: CameraManager,
-    private actionSheetCtrl: ActionSheetController,
+    private uaParser: UAInfo,
     private navCtrl: NavController,
     private toastCtrl: ToastController,
     private modalCtrl: ModalController,
     private platform: Platform,
     private zone: NgZone
-  ) { }
+  ) {
+    // ติดตามการเปลี่ยนแปลง orientation
+    uaParser.setUserAgent(navigator.userAgent);
+    window.addEventListener('orientationchange', this.handleOrientationChange.bind(this));
+  }
 
   ngOnInit() {
     this.setupResumeSubscription();
     this.platform.ready().then(() => {
       const capabilities = this.cameraManager.getCapabilities();
       if (!capabilities) {
-        // ถ้ายังไม่เคยตรวจสอบความสามารถ ให้กลับไปหน้า device check
         this.navCtrl.navigateRoot('/device-check');
         return;
       }
@@ -80,6 +87,33 @@ export class CameraTestPage implements OnInit, OnDestroy, AfterViewInit {
     this.cleanup();
     this.subscriptions.forEach(sub => sub.unsubscribe());
     this.resumeSubscription?.unsubscribe();
+    window.removeEventListener('orientationchange', this.handleOrientationChange.bind(this));
+  }
+
+  private handleOrientationChange() {
+    this.checkOrientation();
+    if (this.cameraManager.isCameraStreaming()) {
+      this.updateResolutionForCurrentOrientation();
+    }
+  }
+
+  private checkOrientation() {
+    this.currentOrientation = window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
+  }
+
+  private async updateResolutionForCurrentOrientation() {
+    const validResolutions = this.filterResolutionsForCurrentOrientation();
+    const currentConfig = this.cameraManager.getCurrentCameraConfig();
+
+    // ตรวจสอบว่าความละเอียดปัจจุบันรองรับ orientation ใหม่หรือไม่
+    const isCurrentResolutionSupported = validResolutions.some(
+      res => res.spec.width === currentConfig.resolution?.width
+    );
+
+    if (!isCurrentResolutionSupported) {
+      // ถ้าไม่รองรับให้เปลี่ยนไปใช้ความละเอียดที่รองรับ
+      await this.changeResolution(validResolutions[0].spec);
+    }
   }
 
   private setupResumeSubscription() {
@@ -207,6 +241,7 @@ export class CameraTestPage implements OnInit, OnDestroy, AfterViewInit {
       this.isLoading = true;
       this.error = null;
 
+      // ตรวจสอบความสามารถของกล้องและความละเอียดที่รองรับ
       const capabilities = this.cameraManager.getCapabilities();
       if (!capabilities || !capabilities.isSupported) {
         throw new Error('Camera not supported or not checked');
@@ -226,9 +261,9 @@ export class CameraTestPage implements OnInit, OnDestroy, AfterViewInit {
         resolution: STANDARD_RESOLUTIONS[VideoResolutionPreset.SQUARE_FHD],
         fallbackResolution: STANDARD_RESOLUTIONS[VideoResolutionPreset.SQUARE_HD],
         mirror: this.currentFacingMode === FacingMode.Front,
-        autoSwapResolution: true
+        autoSwapResolution: this.uaParser.isMobile() || this.uaParser.isTablet(),
+        enableAudio: false
       });
-
 
       // เริ่มกล้องด้วยความละเอียดที่แนะนำ
       await this.cameraManager.startCameraWithResolution(true);
@@ -298,29 +333,49 @@ export class CameraTestPage implements OnInit, OnDestroy, AfterViewInit {
   }
 
   async presentResolutionPicker() {
-    const capabilities = this.cameraManager.getCapabilities();
-    if (!capabilities) return;
+    try {
+      // ตรวจสอบ capabilities ก่อนเปิด modal
+      const capabilities = this.cameraManager.getCapabilities();
+      if (!capabilities) {
+        this.navCtrl.navigateRoot('device-check');
+        return;
+      }
 
-    const buttons = capabilities.supportedResolutions.map(resolution => ({
-      text: STANDARD_RESOLUTIONS[resolution].name,
-      handler: () => this.changeResolution(resolution)
-    }));
+      const modal = await this.modalCtrl.create({
+        component: ResolutionPickerComponent,
+        cssClass: 'resolution-picker-modal'
+      });
 
-    const actionSheet = await this.actionSheetCtrl.create({
-      header: 'Select Resolution',
-      buttons: [...buttons, { text: 'Cancel', role: 'cancel' }]
-    });
-
-    await actionSheet.present();
+      await modal.present();
+      const { data } = await modal.onWillDismiss();
+      if (data) {
+        console.log('Selected resolution:', data);
+      }
+    } catch (error) {
+      console.error('Failed to present resolution picker:', error);
+      this.handleCameraError('RESOLUTION_PICKER_ERROR', error as any);
+    }
   }
 
-  private async changeResolution(preset: VideoResolutionPreset) {
+  private filterResolutionsForCurrentOrientation(): SupportedResolutions[] {
+    const validResolutions = this.supportedResolutions.filter(res =>
+      this.currentOrientation === 'portrait'
+        ? res.supportedOrientations.portrait
+        : res.supportedOrientations.landscape
+    );
+
+    console.log('Valid resolutions:', validResolutions);
+    return validResolutions;
+  }
+
+  private async changeResolution(newResolution: Resolution) {
     try {
       this.isLoading = true;
-      this.cameraManager.setResolution(STANDARD_RESOLUTIONS[preset]);
-      await this.cameraManager.startCameraWithResolution(true);
+
+      // ตั้งค่าความละเอียดใหม่
+      await this.cameraManager.applyConfigChanges({ resolution: newResolution }, true);
     } catch (error) {
-      console.error('Resolution change failed:', error);
+      this.handleCameraError('RESOLUTION_CHANGE_ERROR', error as any);
     } finally {
       this.isLoading = false;
     }
@@ -341,15 +396,6 @@ export class CameraTestPage implements OnInit, OnDestroy, AfterViewInit {
 
     await modal.present();
     const { data } = await modal.onWillDismiss();
-  }
-
-  private async showToast(message: string) {
-    const toast = await this.toastCtrl.create({
-      message,
-      duration: 2000,
-      position: 'bottom'
-    });
-    await toast.present();
   }
 
   async retryInitialization() {

@@ -1,0 +1,106 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title class="text-lg font-semibold">Select Resolution</ion-title>
+    <ion-buttons slot="end">
+      <ion-button
+        (click)="dismiss()"
+        class="text-gray-500 hover:text-gray-700">
+        <ion-icon
+          name="close-circle-outline"
+          class="text-xl"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <!-- Mode Selector -->
+  <div class="flex justify-center mb-6">
+    <div class="inline-flex bg-gray-100 rounded-xl p-1">
+      <button
+        class="flex items-center px-4 py-2 rounded-lg transition-all duration-200"
+        [class.bg-white]="!isLandscape"
+        [class.shadow-sm]="!isLandscape"
+        [class.text-primary]="!isLandscape"
+        [class.text-gray-500]="isLandscape"
+        (click)="isLandscape = false">
+        <ion-icon
+          name="phone-portrait-outline"
+          class="text-lg mr-2"></ion-icon>
+        Portrait
+      </button>
+      <button
+        class="flex items-center px-4 py-2 rounded-lg transition-all duration-200"
+        [class.bg-white]="isLandscape"
+        [class.shadow-sm]="isLandscape"
+        [class.text-primary]="isLandscape"
+        [class.text-gray-500]="!isLandscape"
+        (click)="isLandscape = true">
+        <ion-icon
+          name="phone-landscape-outline"
+          class="text-lg mr-2"></ion-icon>
+        Landscape
+      </button>
+    </div>
+  </div>
+
+  <!-- Resolution List -->
+  <ion-list class="space-y-3">
+    <ion-item
+      *ngFor="let preset of isLandscape ? landscapePresets : portraitPresets"
+      button
+      lines="none"
+      detail="false"
+      (click)="selectResolution(preset)"
+      [class.selected]="isCurrentResolution(preset)"
+      class="rounded-xl">
+      <!-- Resolution Preview -->
+      <div class="flex items-center w-full py-3">
+        <!-- Preview Box -->
+        <div
+          class="relative mr-4 bg-gray-50 rounded-lg overflow-hidden"
+          [class.w-12]="!isLandscape"
+          [class.h-16]="!isLandscape"
+          [class.w-16]="isLandscape"
+          [class.h-12]="isLandscape">
+          <div class="absolute inset-0 flex items-center justify-center">
+            <ion-icon
+              [name]="isLandscape ? 'phone-landscape-outline' : 'phone-portrait-outline'"
+              class="text-2xl text-gray-400"></ion-icon>
+          </div>
+        </div>
+
+        <!-- Resolution Info -->
+        <div class="flex-1">
+          <h2 class="text-lg font-medium">{{ resolutionSpecs[preset].name }}</h2>
+          <div class="flex items-center mt-1">
+            <span class="text-gray-600">
+              {{ resolutionSpecs[preset].width }}×{{ resolutionSpecs[preset].height }}
+            </span>
+            <!-- Quality Badge -->
+            <span
+              class="ml-2 px-2 py-0.5 text-xs font-medium rounded-full"
+              [class.bg-green-100]="getQualityLevel(preset) === 'HD'"
+              [class.text-green-700]="getQualityLevel(preset) === 'HD'"
+              [class.bg-blue-100]="getQualityLevel(preset) === 'SD'"
+              [class.text-blue-700]="getQualityLevel(preset) === 'SD'"
+              [class.bg-gray-100]="getQualityLevel(preset) === 'Basic'"
+              [class.text-gray-700]="getQualityLevel(preset) === 'Basic'">
+              {{ getQualityLevel(preset) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Selected Indicator -->
+        <div
+          *ngIf="isCurrentResolution(preset)"
+          class="flex items-center text-primary">
+          <span class="mr-2 text-sm font-medium">Active</span>
+          <ion-icon
+            name="checkmark-circle"
+            class="text-xl"></ion-icon>
+        </div>
+      </div>
+    </ion-item>
+  </ion-list>
+</ion-content>

@@ -8,6 +8,7 @@ import { CameraTestPageRoutingModule } from './camera-test-routing.module';
 
 import { CameraTestPage } from './camera-test.page';
 import { ImagePreviewComponent } from 'src/app/components/image-preview/image-preview.component';
+import { ResolutionPickerComponent } from 'src/app/components/resolution-picker/resolution-picker.component';
 
 @NgModule({
   imports: [
@@ -16,6 +17,6 @@ import { ImagePreviewComponent } from 'src/app/components/image-preview/image-pr
     IonicModule,
     CameraTestPageRoutingModule
   ],
-  declarations: [CameraTestPage, ImagePreviewComponent]
+  declarations: [CameraTestPage, ImagePreviewComponent, ResolutionPickerComponent]
 })
 export class CameraTestPageModule { }

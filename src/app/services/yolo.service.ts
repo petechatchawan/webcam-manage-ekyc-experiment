@@ -8,7 +8,7 @@ declare var cv: any;
 export class YoloService {
   model: any = {
     net: null,
-    inputShape: [1, 640, 640, 3],
+    inputShape: [1, 200, 200, 3],
   };
 
   classNames: string[] = ['driving_license', 'id_card', 'passport'];
@@ -26,14 +26,14 @@ export class YoloService {
     });
 
     // Warm up the model
-    const dummyInput = tf.ones([1, 640, 640, 3]);
+    const dummyInput = tf.ones([1, 200, 200, 3]);
     await this.model.net.executeAsync(dummyInput);
     tf.dispose(dummyInput);
     console.log('YOLO model loaded successfully');
   }
 
   async processYolo(img: any): Promise<{ type: string, score: number, width: number, height: number }> {
-    const inputSize = 640;
+    const inputSize = 200;
     const resizedYOLOImg = new cv.Mat();
 
     // Resize image for YOLO input size

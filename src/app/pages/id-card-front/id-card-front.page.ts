@@ -2,7 +2,7 @@ import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewCh
 import { AlertController, LoadingController, NavController, Platform, ToastController } from '@ionic/angular';
 import { BehaviorSubject, fromEvent, Subject, Subscription } from 'rxjs';
 import { CameraDeviceSelector } from 'src/app/lib/camera-devices-selector';
-import { CameraErrorCode, CameraManager, CapturedImage, ImageFormat, VideoResolutionPreset } from 'src/app/lib/camera.manager';
+import { CameraErrorCode, CameraManager, CapturedImage, ImageFormat } from 'src/app/lib/camera.manager';
 import { CropPresets } from 'src/app/lib/constants/crop-preset';
 import { STANDARD_RESOLUTIONS } from 'src/app/lib/constants/resolution.preset';
 import { THA_FAST_MODEL } from 'src/app/lib/constants/tesseract';
@@ -10,6 +10,7 @@ import { FacingMode } from 'src/app/lib/types/camera.types';
 import { CropPreset } from 'src/app/lib/types/crop.types';
 import { ProcessedOcrFrame } from 'src/app/lib/types/ocr.types';
 import { ProcessingState } from 'src/app/lib/types/processing.state.types';
+import { VideoResolutionPreset } from 'src/app/lib/types/resolution.types';
 import { CardRegExpService, HOCRResult } from 'src/app/services/card-reg-exp.service';
 import { ImageProcessingService } from 'src/app/services/image-processing.service';
 import { OcrService } from 'src/app/services/ocr.service';
@@ -167,7 +168,7 @@ export class IdCardFrontPage implements OnInit, AfterViewInit, OnDestroy {
 
       const cameraExtension = new CameraDeviceSelector();
       const allDevices = await this.cameraManager.getCameraDevices();
-      const selectedCamera = await cameraExtension.selectCamera(allDevices, FacingMode.Front);
+      const selectedCamera = await cameraExtension.selectCamera(allDevices, FacingMode.Back);
       if (!selectedCamera) {
         throw new Error('No camera device found');
       }

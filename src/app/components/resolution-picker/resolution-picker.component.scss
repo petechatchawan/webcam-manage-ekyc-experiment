@@ -1,0 +1,33 @@
+.selected {
+  --background: var(--ion-color-light);
+}
+ion-item {
+  --padding-start: 0;
+  margin-bottom: 8px;
+  border-radius: 8px;
+}
+
+ion-item {
+  --padding-start: 1rem;
+  --padding-end: 1rem;
+  --background: white;
+  --border-radius: 0.75rem;
+  --border-color: #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+ion-item.selected {
+  --background: rgba(var(--ion-color-primary-rgb), 0.04);
+  --border-color: var(--ion-color-primary);
+  box-shadow: 0 0 0 1px var(--ion-color-primary);
+}
+
+ion-item:hover:not(.selected) {
+  --background: #fafafa;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+ion-item::part(native) {
+  border-radius: 0.75rem;
+}

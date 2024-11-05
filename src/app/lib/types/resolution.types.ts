@@ -5,6 +5,18 @@ export interface Resolution {
     name: string;
     preset?: VideoResolutionPreset; // optional เพื่อรองรับ custom resolution
 }
+export interface ResolutionOrientationSupport {
+    landscape: boolean;
+    portrait: boolean;
+}
+
+export interface SupportedResolutions {
+    preset: VideoResolutionPreset;
+    supported: boolean;
+    supportedOrientations: ResolutionOrientationSupport;
+    spec: Resolution;
+    deviceId: string;
+}
 
 export enum VideoResolutionPreset {
     SD = 'SD',

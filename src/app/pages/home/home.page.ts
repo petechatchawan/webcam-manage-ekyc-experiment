@@ -1,7 +1,8 @@
-import { CameraCapability, CameraManager, VideoResolutionPreset } from 'src/app/lib/camera.manager';
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { CameraCapability, CameraManager } from 'src/app/lib/camera.manager';
 import { STANDARD_RESOLUTIONS } from 'src/app/lib/constants/resolution.preset';
+import { VideoResolutionPreset } from 'src/app/lib/types/resolution.types';
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
@@ -74,9 +75,31 @@ export class HomePage implements OnInit {
     }
   }
 
-  getResolutionTooltip(resolution: VideoResolutionPreset): string {
-    const spec = this.RESOLUTION_SPECS[resolution];
-    return `${spec.name} - ${spec.width}x${spec.height} (${spec.aspectRatio}:1)`;
+  getResolutionTooltip(preset: VideoResolutionPreset): string {
+    const spec = STANDARD_RESOLUTIONS[preset];
+    return `${spec.name} (${spec.width}x${spec.height})`;
+  }
+
+  isCurrentOrientation(resolution: {
+    preset: VideoResolutionPreset;
+    orientations: { landscape: boolean; portrait: boolean; }
+  }): boolean {
+    const currentConfig = this.cameraManager.getCurrentCameraConfig();
+    return currentConfig.resolution?.preset === resolution.preset;
+  }
+
+  isRecommendedResolution(preset: VideoResolutionPreset): boolean {
+    const cameraCapability = this.cameraManager.getCapabilities();
+    if (!cameraCapability) return false;
+    return preset === cameraCapability.recommendedResolution;
+  }
+
+  // Helper method สำหรับแสดงชื่อ aspect ratio ที่สวยงาม
+  getAspectRatioDisplay(ratio: number): string {
+    if (ratio === 16 / 9) return '16:9';
+    if (ratio === 4 / 3) return '4:3';
+    if (ratio === 1) return '1:1';
+    return ratio.toFixed(2) + ':1';
   }
 
   goToWelcome() {

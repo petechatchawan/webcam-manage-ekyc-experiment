@@ -203,19 +203,73 @@
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div
                   *ngFor="let resolution of cameraCapability.supportedResolutions"
-                  class="flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                  [title]="getResolutionTooltip(resolution)">
-                  <div class="min-w-0 flex-1">
+                  class="flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg mb-2"
+                  [title]="getResolutionTooltip(resolution.preset)">
+                  <div class="min-w-0 flex-1 space-y-2">
+                    <!-- Resolution Name -->
                     <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {{ RESOLUTION_SPECS[resolution].name }}
+                      {{ RESOLUTION_SPECS[resolution.preset].name }}
                     </p>
+
+                    <!-- Resolution Dimensions -->
                     <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {{ RESOLUTION_SPECS[resolution].width }}x{{ RESOLUTION_SPECS[resolution].height }}
+                      {{ RESOLUTION_SPECS[resolution.preset].width }}x{{ RESOLUTION_SPECS[resolution.preset].height }}
                     </p>
+
+                    <!-- Orientation Support -->
+                    <div class="flex items-center gap-2 mt-1">
+                      <!-- Portrait Support -->
+                      <div
+                        class="flex items-center"
+                        [class.text-green-500]="resolution.orientations.portrait"
+                        [class.text-gray-400]="!resolution.orientations.portrait">
+                        <ion-icon
+                          [name]="resolution.orientations.portrait ? 'phone-portrait' : 'phone-portrait-outline'"
+                          class="w-4 h-4 mr-1"></ion-icon>
+                        <span class="text-xs">Portrait</span>
+                      </div>
+
+                      <!-- Landscape Support -->
+                      <div
+                        class="flex items-center"
+                        [class.text-green-500]="resolution.orientations.landscape"
+                        [class.text-gray-400]="!resolution.orientations.landscape">
+                        <ion-icon
+                          [name]="resolution.orientations.landscape ? 'phone-landscape' : 'phone-landscape-outline'"
+                          class="w-4 h-4 mr-1"></ion-icon>
+                        <span class="text-xs">Landscape</span>
+                      </div>
+
+                      <!-- Current Orientation Indicator -->
+                      <div
+                        *ngIf="isCurrentOrientation(resolution)"
+                        class="ml-auto flex items-center text-blue-500">
+                        <ion-icon
+                          name="checkmark-circle"
+                          class="w-4 h-4 mr-1"></ion-icon>
+                        <span class="text-xs">Current</span>
+                      </div>
+                    </div>
+
+                    <!-- Additional Info -->
+                    <div class="flex flex-wrap gap-2 mt-1">
+                      <span class="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded-full">
+                        {{ RESOLUTION_SPECS[resolution.preset].aspectRatio.toFixed(2) }} : 1
+                      </span>
+                      <span
+                        *ngIf="resolution.preset === cameraCapability.recommendedResolution"
+                        class="text-xs px-2 py-1 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 rounded-full">
+                        Recommended
+                      </span>
+                    </div>
                   </div>
-                  <ion-icon
-                    name="checkmark-circle"
-                    class="text-green-500 ml-2 flex-shrink-0"></ion-icon>
+                </div>
+
+                <!-- No Resolutions Message -->
+                <div
+                  *ngIf="cameraCapability.supportedResolutions.length === 0"
+                  class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
+                  <p class="text-sm text-gray-500 dark:text-gray-400">No supported resolutions found</p>
                 </div>
               </div>
 
