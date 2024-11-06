@@ -11,6 +11,7 @@ import { CropPreset } from 'src/app/lib/types/crop.types';
 import { ProcessedOcrFrame } from 'src/app/lib/types/ocr.types';
 import { ProcessingState } from 'src/app/lib/types/processing.state.types';
 import { VideoResolutionPreset } from 'src/app/lib/types/resolution.types';
+import { UAInfo } from 'src/app/lib/ua-info';
 import { CardRegExpService, HOCRResult } from 'src/app/services/card-reg-exp.service';
 import { ImageProcessingService } from 'src/app/services/image-processing.service';
 import { OcrService } from 'src/app/services/ocr.service';
@@ -35,6 +36,7 @@ export class IdCardFrontPage implements OnInit, AfterViewInit, OnDestroy {
     private ocrService: OcrService,
     private yoloService: YoloService,
     private cardRegExpService: CardRegExpService,
+    private uaInfo: UAInfo,
     private loadingCtrl: LoadingController,
     private alertCtrl: AlertController,
     private toastCtrl: ToastController,
@@ -62,21 +64,19 @@ export class IdCardFrontPage implements OnInit, AfterViewInit, OnDestroy {
   processingTime: string = '';
 
   ngOnInit() {
-    this.setupResumeSubscription();
+    // this.setupResumeSubscription();
     this.platform.ready().then(() => {
       const capabilities = this.cameraManager.getCapabilities();
       if (!capabilities) {
-        // ถ้ายังไม่เคยตรวจสอบความสามารถ ให้กลับไปหน้า device check
         this.navCtrl.navigateRoot('/device-check');
         return;
       }
 
-      console.log('Platform ready, initializing camera...');
       this.initializeCamera();
     });
   }
 
-  ngAfterViewInit() {
+  async ngAfterViewInit() {
     try {
       if (!this.videoElement || !this.canvasElement) {
         throw new Error('Video element or canvas element not found');
@@ -85,11 +85,11 @@ export class IdCardFrontPage implements OnInit, AfterViewInit, OnDestroy {
       // เพิ่ม visibility change listener
       this.subscriptions.push(
         fromEvent(document, 'visibilitychange').subscribe(() => {
-          this.handleVisibilityChange();
+          // this.handleVisibilityChange();
         })
       );
     } catch (error: any) {
-      this.handleCameraError('ngAfterViewInit', error.message);
+      await this.handleCameraError('ngAfterViewInit', error.message);
     }
   }
 
@@ -97,113 +97,112 @@ export class IdCardFrontPage implements OnInit, AfterViewInit, OnDestroy {
     this.cleanup();
     this.subscriptions.forEach(sub => sub.unsubscribe());
     this.resumeSubscription?.unsubscribe();
-    this.ocrResult$.complete();
-
-    // Complete destroy$ subject
-    this.destroy$.next();
-    this.destroy$.complete();
+    // window.removeEventListener('orientationchange', this.handleOrientationChange.bind(this));
   }
 
-
-  // =================== Private ====================
-
-  private setupResumeSubscription() {
-    // รับ event เมื่อแอพกลับมาทำงาน
-    this.resumeSubscription = this.platform.resume.subscribe(() => {
-      this.zone.run(() => {
-        console.log('App resumed, reinitializing camera...');
-        this.reinitializeCamera();
-      });
-    });
-  }
-
-  private handleVisibilityChange() {
-    if (document.hidden) {
-      // หน้าเว็บถูกซ่อน (เช่น switch tab)
-      this.stopCamera();
-    } else {
-      // หน้าเว็บกลับมาแสดงผล
-      this.reinitializeCamera();
-    }
-  }
-
-  private async reinitializeCamera() {
-    console.log('Reinitializing camera...');
-    if (this.error || !this.isCameraReady) {
-      await this.cleanup();
-      await this.initializeCamera();
-    } else {
-      // ถ้ากล้องทำงานอยู่แล้ว ให้ตรวจสอบสถานะ
-      const isActive = await this.cameraManager.checkCameraActive();
-      if (!isActive) {
-        await this.cleanup();
-        await this.initializeCamera();
-      }
-    }
-  }
-
-  private async cleanup() {
-    await this.cameraManager.stopCamera();
-    this.cameraManager.destroy();
-    this.isCameraReady = false;
-    this.error = null;
-  }
-
-  async initializeCamera() {
+  /**
+  * Initialize camera with proper error handling and state management
+  */
+  public async initializeCamera(): Promise<void> {
     if (this.isLoading) {
-      console.log('Camera is already loading');
       return;
     }
 
     try {
       this.isLoading = true;
       this.error = null;
-      // load and set state mirror mode
-      this.isMirrorMode = localStorage.getItem('isMirrorMode') === 'true';
 
-      const capabilities = this.cameraManager.getCapabilities();
-      if (!capabilities || !capabilities.isSupported) {
-        throw new Error('Camera not supported or not checked');
-      }
-
-      const cameraExtension = new CameraDeviceSelector();
-      const allDevices = await this.cameraManager.getCameraDevices();
-      const selectedCamera = await cameraExtension.selectCamera(allDevices, FacingMode.Back);
-      if (!selectedCamera) {
-        throw new Error('No camera device found');
-      }
-
-      console.log('[CameraManager] Selected camera:', selectedCamera);
-
-
-      // รอสร้าง elements สำหรับการใช้งาน
-      await this.waitForElements();
-
-      // จัดการเกี่ยวกับ event ของกล้อง
       this.setupCameraEvents();
-
-      // ตั้งค่า configuration
-      this.cameraManager.setCurrentCameraConfiguration({
-        videoElement: this.videoElement.nativeElement,
-        canvasElement: this.canvasElement.nativeElement,
-        enableAudio: false,
-        selectedDevice: selectedCamera,
-        resolution: STANDARD_RESOLUTIONS[VideoResolutionPreset.FHD],
-        fallbackResolution: STANDARD_RESOLUTIONS[VideoResolutionPreset.HD],
-        autoSwapResolution: true,
-        mirror: this.isMirrorMode,
-      });
-
-      // เริ่มกล้องด้วยความละเอียดที่แนะนำ
-      await this.cameraManager.startCameraWithResolution(true);
-    } catch (err: any) {
-      this.handleCameraError('INITIALIZATION_ERROR', err.message);
+      await this.checkAndRequestPermissions();
+      await this.setupInitialCamera();
+    } catch (error) {
+      this.handleCameraError('Camera Initialization Error', error as any);
     } finally {
       this.isLoading = false;
     }
   }
 
-  private waitForElements = async (): Promise<void> => {
+  /**
+   * Setup camera events
+   */
+  private setupCameraEvents() {
+    // Event listener สำหรับทุก events
+    // this.hasMultipleCameras = this.cameraManager.hasMultipleCameras();
+    this.cameraManager.on('ALL', (response) => {
+      if (response.status === 'error') {
+        this.handleCameraError(response.error?.code, response.error?.message);
+      }
+    });
+
+    // Event listener สำหรับเมื่อกล้องเริ่มทำงานสำเร็จ
+    this.cameraManager.on('START_CAMERA_SUCCESS', () => {
+      this.zone.run(async () => {
+        this.isCameraReady = true;
+        this.isLoading = false;
+        await this.startProcessing();
+        // this.currentCameraDevice = this.cameraManager.getCurrentCameraDevice();
+        // this.currentResolution = this.cameraManager.getCurrentResolution() || { width: 0, height: 0, aspectRatio: 0, name: '' };
+      });
+    });
+
+    // Event listener สำหรับเมื่อกล้องหยุดทำงาน
+    this.cameraManager.on('STOP_CAMERA', () => {
+      this.zone.run(() => {
+        this.isCameraReady = false;
+      });
+    });
+  }
+
+  /**
+   * Check and request camera permissions
+   */
+  private async checkAndRequestPermissions(): Promise<void> {
+    try {
+      const hasPermission = await this.cameraManager.hasPermissions();
+      if (!hasPermission) {
+        const isGranted = await this.cameraManager.requestPermission();
+        if (!isGranted) {
+          throw new Error('Camera permission denied');
+        }
+      }
+
+      // if granted, get all camera devices
+      await this.cameraManager.getCameraDevices();
+    } catch (error) {
+      await this.handleCameraError('Camera Permissions Error', error as any);
+    }
+  }
+
+  /**
+  * Setup initial camera configuration
+  */
+  private async setupInitialCamera(): Promise<void> {
+    const cameraDeviceSelector = new CameraDeviceSelector();
+    const allDevices = await this.cameraManager.getCameraDevices();
+    const selectedCamera = await cameraDeviceSelector.selectCamera(allDevices, FacingMode.Front);
+    if (!selectedCamera) {
+      throw new Error('No camera device found');
+    }
+
+    // ตั้งค่าการใช้งานกล้อง
+    await this.waitForElements();
+
+    // ตั้งค่าการใช้งานกล้อง
+    this.cameraManager.setCurrentCameraConfiguration({
+      videoElement: this.videoElement.nativeElement,
+      canvasElement: this.canvasElement.nativeElement,
+      enableAudio: false,
+      resolution: STANDARD_RESOLUTIONS[VideoResolutionPreset.FHD],
+      fallbackResolution: STANDARD_RESOLUTIONS[VideoResolutionPreset.HD],
+      autoSwapResolution: this.uaInfo.isMobile() || this.uaInfo.isTablet(),
+      // mirror: this.currentFacingMode === FacingMode.Front,
+    });
+
+    // เริ่มกล้องด้วยความละเอียดที่แนะนำ
+    await this.cameraManager.startCameraWithResolution(true);
+  }
+
+  private async waitForElements(): Promise<void> {
     return new Promise((resolve) => {
       const checkElements = () => {
         if (this.videoElement && this.canvasElement) {
@@ -216,39 +215,18 @@ export class IdCardFrontPage implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private setupCameraEvents = () => {
-    if (!this.cameraManager) return;
+  private stopCamera() {
+    this.cameraManager.stopCamera();
+    if (this.predictionInterval) {
+      clearInterval(this.predictionInterval);
+    }
+  }
 
-    // Event listener สำหรับทุก events
-    this.cameraManager.on('ALL', (response) => {
-      if (response.status === 'error') {
-        this.handleCameraError(response.error?.code, response.error?.message);
-      }
-    });
-
-    // Event listener สำหรับเมื่อกล้องเริ่มทำงานสำเร็จ
-    this.cameraManager.on('START_CAMERA_SUCCESS', () => {
-      this.zone.run(() => {
-        this.toastCtrl.create({
-          message: 'กล้องเริ่มทำงานแล้ว',
-          duration: 2000
-        });
-
-        this.isCameraReady = true;
-        this.isLoading = false;
-        this.isOcrProcessingEnabled = true;
-
-        // เริ่มการ predict ทุก 500ms
-        this.startProcessing();
-      });
-    });
-
-    // Event listener สำหรับเมื่อกล้องหยุดทำงาน
-    this.cameraManager.on('STOP_CAMERA', () => {
-      this.zone.run(() => {
-        this.isCameraReady = false;
-      });
-    });
+  private async cleanup() {
+    await this.cameraManager.stopCamera();
+    this.cameraManager.destroy();
+    this.isCameraReady = false;
+    this.error = null;
   }
 
   private async startProcessing(): Promise<void> {
@@ -485,18 +463,37 @@ export class IdCardFrontPage implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private stopCamera() {
-    if (this.cameraManager) {
-      this.cameraManager.stopCamera();
-    }
-    if (this.predictionInterval) {
-      clearInterval(this.predictionInterval);
-    }
-  }
-
   retakePhoto() {
     this.ocrResult$.next(null);
     this.reinitializeCamera();
+  }
+
+  private async reinitializeCamera() {
+    if (this.error || !this.isCameraReady) {
+      await this.cleanup();
+      await this.initializeCamera();
+    } else {
+      // ถ้ากล้องทำงานอยู่แล้ว ให้ตรวจสอบสถานะ
+      const isActive = await this.checkCameraActive();
+      if (!isActive) {
+        await this.cleanup();
+        await this.initializeCamera();
+      }
+    }
+  }
+
+  private async checkCameraActive(): Promise<boolean> {
+    if (!this.cameraManager || !this.cameraManager.getCurrentCameraDevice()) {
+      return false;
+    }
+
+    try {
+      const track = this.cameraManager.getCurrentStream()?.getVideoTracks()[0];
+      return track?.readyState === 'live';
+    } catch (error) {
+      console.error('Error checking camera state:', error);
+      return false;
+    }
   }
 
   async confirmAndProceed() {
@@ -525,7 +522,7 @@ export class IdCardFrontPage implements OnInit, AfterViewInit, OnDestroy {
 
   // =============== Private Methods ===============
 
-  private handleCameraError(code?: string, message?: string) {
+  private async handleCameraError(code?: string, message?: string) {
     this.isLoading = false;
     let errorMessage = 'An error occurred with the camera';
 
@@ -547,7 +544,7 @@ export class IdCardFrontPage implements OnInit, AfterViewInit, OnDestroy {
     this.isCameraReady = false;
 
     // แสดง toast error
-    this.showErrorToast(errorMessage);
+    await this.showErrorToast(errorMessage);
   }
 
   private async showErrorToast(message: string) {
