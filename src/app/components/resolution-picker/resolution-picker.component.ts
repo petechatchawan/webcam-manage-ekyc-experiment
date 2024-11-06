@@ -14,10 +14,11 @@ export class ResolutionPickerComponent implements OnInit {
   portraitPresets: VideoResolutionPreset[] = [];
   landscapePresets: VideoResolutionPreset[] = [];
   currentResolution?: VideoResolutionPreset;
+  isLandscape = false;
   selectedOrientation: 'portrait' | 'landscape' = 'portrait';
   readonly activeTabClass = 'px-4 py-2 rounded-md bg-white shadow text-primary transition-all';
   readonly inactiveTabClass = 'px-4 py-2 text-gray-600 hover:text-gray-800 transition-all';
-  isLandscape = false;
+
   constructor(
     private modalCtrl: ModalController,
     private cameraManager: CameraManager,
@@ -73,9 +74,9 @@ export class ResolutionPickerComponent implements OnInit {
     try {
       await this.cameraManager.applyConfigChanges({ resolution: STANDARD_RESOLUTIONS[preset] }, true);
       this.dismiss(preset);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to change resolution:', error);
-      throw error;
+      this.showErrorToast(error.message);
     }
   }
 

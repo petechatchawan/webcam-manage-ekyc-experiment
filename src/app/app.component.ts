@@ -1,3 +1,4 @@
+import { UAInfo } from 'src/app/lib/ua-info';
 import { Component } from '@angular/core';
 
 @Component({
@@ -6,5 +7,7 @@ import { Component } from '@angular/core';
   styleUrls: ['app.component.scss'],
 })
 export class AppComponent {
-  constructor() {}
+  constructor(private uaInfo: UAInfo) {
+    this.uaInfo.setUserAgent(navigator.userAgent);
+  }
 }

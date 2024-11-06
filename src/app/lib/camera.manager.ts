@@ -1,11 +1,10 @@
 import { BehaviorSubject } from "rxjs";
-import { UAInfo } from "./ua-info";
 import { STANDARD_RESOLUTIONS } from "./constants/resolution.preset";
 import { Resolution, ResolutionOrientationSupport, SupportedResolutions, VideoResolutionPreset } from "./types/resolution.types";
-import { EventEmitter } from "@angular/core";
+import { UAInfo } from "./ua-info";
 
 // ================== Types & Interfaces ==================
-interface CameraConfiguration {
+export interface CameraConfiguration {
     videoElement?: HTMLVideoElement;
     canvasElement?: HTMLCanvasElement;
     selectedDevice?: MediaDeviceInfo;
@@ -166,18 +165,26 @@ export class CameraManager {
        * เริ่มกล้องด้วยการตั้งค่าปัจจุบัน
        */
     public async startCamera(): Promise<void> {
+        console.log('Starting camera with current configuration...');
         this.isCameraInitializedFlag = false;
         const constraints = this.createConstraints();
+        console.log('Constraints created:', constraints);
 
         try {
             const stream = await this.initializeStream(constraints);
+            console.log('Stream initialized:', stream);
             this.saveActiveConfig(stream);
+            console.log('Active configuration saved.');
             this.applyMirrorEffect();
+            console.log('Mirror effect applied.');
             await this.setVideoStream(stream);
+            console.log('Video stream set successfully.');
         } catch (error) {
+            console.error('Error starting camera:', error);
             throw error; // ส่งต่อ error ไปให้ startCameraWithResolution จัดการ
         } finally {
             this.isCameraInitializedFlag = true;
+            console.log('Camera initialization flag set to true.');
         }
     }
 
@@ -385,12 +392,15 @@ export class CameraManager {
      */
     public async startCameraWithResolution(allowFallback: boolean = false): Promise<void> {
         try {
+            console.log('[CameraManager] Starting camera with resolution...');
             await this.startCamera();
         } catch (error: any) {
+            console.error('[CameraManager] Error starting camera with resolution:', error);
             if (error.name === 'OverconstrainedError' &&
                 allowFallback &&
                 this.currentCameraConfig.fallbackResolution
             ) {
+                console.log('[CameraManager] Falling back to previous resolution:', this.currentCameraConfig.resolution);
                 const prevResolution: Resolution = {
                     width: this.currentCameraConfig.resolution?.width ?? 0,
                     height: this.currentCameraConfig.resolution?.height ?? 0,
@@ -398,10 +408,13 @@ export class CameraManager {
                     name: this.currentCameraConfig.resolution?.name ?? ''
                 };
                 if (this.isValidResolutionSpec(this.currentCameraConfig.fallbackResolution)) {
+                    console.log('[CameraManager] Using fallback resolution:', this.currentCameraConfig.fallbackResolution);
                     this.currentCameraConfig.resolution = this.currentCameraConfig.fallbackResolution;
                     try {
+                        console.log('[CameraManager] Starting camera with fallback resolution...');
                         await this.startCamera();
                     } catch (fallbackError) {
+                        console.error('[CameraManager] Error starting camera with fallback resolution:', fallbackError);
                         this.currentCameraConfig.resolution = prevResolution;
                         throw fallbackError;
                     }
@@ -409,7 +422,11 @@ export class CameraManager {
                     throw new Error('Invalid fallback resolution specification');
                 }
             } else {
-                throw error;
+                throw this.createError(
+                    CameraErrorCode.INITIALIZATION_ERROR,
+                    "Failed to start camera with resolution",
+                    error
+                );
             }
         }
     }
@@ -515,7 +532,6 @@ export class CameraManager {
      * @param forceRestart บังคับให้รีสตาร์ทกล้องหรือไม่
      */
     public async applyConfigChanges(newConfig: Partial<CameraConfiguration>, forceRestart: boolean = false): Promise<void> {
-        console.log('Applying config changes:', newConfig);
         try {
             const prevConfig = { ...this.currentCameraConfig };
             const isDeviceChanged = newConfig.selectedDevice?.deviceId !== this.currentCameraConfig.selectedDevice?.deviceId;
@@ -524,11 +540,6 @@ export class CameraManager {
                 newConfig.resolution.width !== this.currentCameraConfig.resolution?.width ||
                 newConfig.resolution.height !== this.currentCameraConfig.resolution?.height
             );
-
-            console.log('Previous config:', prevConfig);
-            console.log('Device changed:', isDeviceChanged);
-            console.log('Facing mode changed:', isFacingModeChanged);
-            console.log('Resolution changed:', isResolutionChanged);
 
             this.currentCameraConfig = {
                 ...this.currentCameraConfig,
