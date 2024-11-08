@@ -1,6 +1,8 @@
 import { Injectable } from "@angular/core";
-import { Dimensions, IdSizeLimitations, IdSizeValidation, IdNumberBoundingBox, IdCardSize, BoundingBox } from "../interfaces/ocr";
-import { CropPreset } from "../interfaces/crop-preset.interface";
+import { CropPreset } from "../lib/types/crop.types";
+import { OCRBoundingBox } from "../lib/types/ocr-parser.types";
+import { Dimensions, IdCardSize, IdNumberBoundingBox, IdSizeLimitations, IdSizeValidation } from "../lib/types/ocr.types";
+
 
 
 @Injectable({
@@ -101,7 +103,7 @@ export class ValidationIdCardService {
    * Validate ID card size from bounding box for the front side
    */
   public async validateFrontIdCardSize(
-    boundingBox: BoundingBox,
+    boundingBox: OCRBoundingBox,
     videoElement: HTMLVideoElement,
     processedCanvas: HTMLCanvasElement,
   ): Promise<IdSizeValidation> {
@@ -112,7 +114,7 @@ export class ValidationIdCardService {
    * Validate ID card size from bounding box for the back side
    */
   public async validateBackIdCardSize(
-    boundingBox: BoundingBox,
+    boundingBox: OCRBoundingBox,
     videoElement: HTMLVideoElement,
     processedCanvas: HTMLCanvasElement,
   ): Promise<IdSizeValidation> {
@@ -120,7 +122,7 @@ export class ValidationIdCardService {
   }
 
   private async validateIdCardSize(
-    boundingBox: BoundingBox,
+    boundingBox: OCRBoundingBox,
     videoElement: HTMLVideoElement,
     processedCanvas: HTMLCanvasElement,
     idCardWidth: number,
@@ -159,7 +161,7 @@ export class ValidationIdCardService {
   private calculateBoundingBox(
     videoElement: HTMLVideoElement,
     processedCanvas: HTMLCanvasElement,
-    boundingBox: BoundingBox,
+    boundingBox: OCRBoundingBox,
   ): IdNumberBoundingBox | null {
     if (!this.cropPreset || this.resizeThreshold <= 0) {
       return null;

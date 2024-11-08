@@ -1,42 +1,9 @@
+import { OCRBoundingBox } from "./ocr-parser.types";
 import { ProcessingState } from "./processing.state.types";
-
-// export interface HOCRWord {
-//   id: string;
-//   text: string;
-//   boundingBox: number[];
-//   confidence: number;
-//   blockId: string;
-//   lineId: string;
-// }
-
-// export interface HOCRLine {
-//   lineId: string;
-//   text: string;
-//   words: HOCRWord[];
-// }
-
-// export interface HOCRResult {
-//   processingTimeMs: number;
-//   extractedText: string;
-//   lines: HOCRLine[];
-//   nationalIdInfo: {
-//     nationalId?: string;
-//     laserId?: string;
-//     lineId: string;
-//     boundingBox: BoundingBox;
-//   };
-// }
 
 export interface Dimensions {
   width: number;
   height: number;
-}
-
-export interface BoundingBox {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
 }
 
 // ผลลัพธ์การประมวลผลเฟรม
@@ -53,7 +20,7 @@ export interface ProcessedOcrFrame {
 export interface OcrExtractedData {
   idNumber?: string;
   detectedWords?: string[];
-  idNumberBoundingBox?: BoundingBox;
+  idNumberBoundingBox?: OCRBoundingBox;
   cardDimensions?: IdSizeValidation;
 }
 

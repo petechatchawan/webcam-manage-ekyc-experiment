@@ -10,14 +10,14 @@
 <ion-content class="ion-padding">
   <div class="max-w-md mx-auto space-y-4">
     <!-- กล้อง Preview -->
-    <p class="text-center font-bold my-4">{{processingTime}} ms.</p>
     <div class="relative aspect-[16/9] bg-black rounded-lg overflow-hidden">
       <!-- Video Preview -->
       <video
         #videoElement
-        class="absolute inset-0 w-full h-full object-cover"
         autoplay
-        playsinline></video>
+        playsinline
+        muted
+        class="h-full object-contain"></video>
 
       <!-- Hidden Canvas -->
       <canvas
@@ -26,7 +26,7 @@
 
       <!-- Loading Overlay -->
       <div
-        *ngIf="isLoading"
+        *ngIf="state.isLoading"
         class="absolute inset-0 bg-black/50 flex items-center justify-center">
         <ion-spinner
           name="circular"
@@ -34,18 +34,16 @@
       </div>
 
       <!-- ID Card Overlay -->
-      <div class="absolute inset-0 flex items-center justify-center">
+      <!-- <div class="absolute inset-0 flex items-center justify-center">
         <div
-          class="relative w-[85%] aspect-[1.586] border-2 
-                    {{ isCardDetected ? 'border-green-500' : 'border-white' }} 
+          class="relative w-[85%] aspect-[1.586] border-2
+                    {{ isCardDetected ? 'border-green-500' : 'border-white' }}
                     border-dashed rounded-lg">
-          <!-- ข้อความแนะนำ -->
           <div
             *ngIf="!isCardDetected"
             class="absolute -top-8 left-0 right-0 text-center text-white text-sm">
             กรุณาวางบัตรให้อยู่ในกรอบ
           </div>
-          <!-- ไฟแสดงสถานะการตรวจจับ -->
           <div
             *ngIf="isCardDetected"
             class="absolute -top-8 left-0 right-0 flex items-center justify-center space-x-2">
@@ -53,7 +51,7 @@
             <span class="text-green-400 text-sm">ตรวจพบบัตรประชาชน</span>
           </div>
         </div>
-      </div>
+      </div> -->
 
       <!-- ปุ่มถ่ายภาพ -->
       <!-- <button
@@ -79,48 +77,76 @@
             d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
       </button>
+
+      <button
+        (click)="toggleMirrorMode()"
+        class="absolute top-4 right-16 bg-black/50 text-white p-2 rounded-full">
+        <svg
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15.5 12a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z" />
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M20 10V7a2 2 0 00-2-2H6a2 2 0 00-2 2v3m16 4v3a2 2 0 01-2 2H6a2 2 0 01-2-2v-3m16-4h-2.5a1 1 0 00-.7.3l-1.4 1.4a1 1 0 01-.7.3h-3.4a1 1 0 01-.7-.3l-1.4-1.4a1 1 0 00-.7-.3H4" />
+        </svg>
+      </button>
     </div>
 
     <!-- แสดงผล OCR -->
     <!-- <div
-      *ngIf="ocrResult$ | async as result"
+      *ngIf="yoloResult$ | async as result"
       class="bg-white rounded-lg shadow-lg p-4 space-y-4 animate-fade-in">
       <div class="flex items-center justify-between">
         <h3 class="text-lg font-semibold">ผลการสแกน</h3>
-        <div class="text-sm text-gray-500">ความแม่นยำ: {{result.confidence}}%</div>
+        <div class="text-sm text-gray-500">ความแม่นยำ: {{result.confidence.toFixed(2)}}%</div>
       </div>
 
       <div class="space-y-3">
         <div class="flex justify-between items-center py-2 border-b">
-          <span class="text-gray-600">เลขบัตรประชาชน</span>
-          <span class="font-medium">{{result.idNumber || '-'}}</span>
+          <span class="text-gray-600">ประเภทเอกสาร</span>
+          <span class="font-medium text-gray-600">{{result.documentType || '-'}}</span>
         </div>
         <div class="flex justify-between items-center py-2 border-b">
-          <span class="text-gray-600">ชื่อ-นามสกุล</span>
-          <span class="font-medium">{{result.fullName || '-'}}</span>
+          <span class="text-gray-600">ความกว้างของเอกสาร</span>
+          <span class="font-medium text-gray-600">{{result.dimensions.width.toFixed(2) || '-'}}</span>
         </div>
         <div class="flex justify-between items-center py-2 border-b">
-          <span class="text-gray-600">วันเกิด</span>
-          <span class="font-medium">{{result.dateOfBirth || '-'}}</span>
+          <span class="text-gray-600">ความยาวของเอกสาร</span>
+          <span class="font-medium text-gray-600">{{result.dimensions.height.toFixed(2) || '-'}}</span>
         </div>
         <div class="flex justify-between items-center py-2 border-b">
-          <span class="text-gray-600">ที่อยู่</span>
-          <span class="font-medium">{{result.address || '-'}}</span>
+          <span class="text-gray-600">เวลาในการประมวลผล</span>
+          <span class="font-medium text-gray-600">{{result.processingTimeMs.toFixed(2) || '-'}}</span>
         </div>
-      </div>
+      </div> -->
 
-      <div class="flex space-x-3">
+    <!-- <div class="flex space-x-3">
         <button
           (click)="retakePhoto()"
           class="flex-1 py-2 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus:outline-none">
           ถ่ายใหม่
         </button>
         <button
-          (click)="confirmAndProceed()"
+          (click)="handleSuccessfulScan()"
           class="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none">
           ยืนยันข้อมูล
         </button>
+      </div> -->
+    <!-- </div> -->
+
+    <div class="bg-white rounded-lg shadow-lg p-4 space-y-4 animate-fade-in">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-800">ผลการสแกน</h3>
+        <div class="text-sm text-gray-500">ใช้เวลา: {{state.processingTime}} ms</div>
       </div>
-    </div> -->
+    </div>
   </div>
 </ion-content>

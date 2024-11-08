@@ -57,7 +57,7 @@ export class ImageProcessingService {
     return canvas.toDataURL(IMAGE_CONFIG.mimeType);
   }
 
-  async base64ToImageBitmap(base64Image: string): Promise<ImageBitmap> {
+  public async base64ToImageBitmap(base64Image: string): Promise<ImageBitmap> {
     const base64Data = base64Image.split(',')[1] || base64Image;
     const blob = new Blob([Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))], {
       type: IMAGE_CONFIG.mimeType,
@@ -65,7 +65,7 @@ export class ImageProcessingService {
     return createImageBitmap(blob);
   }
 
-  public convertBase64ToImageFile(base64Image: string): File | null {
+  public base64ToImageFile(base64Image: string): File | null {
     // Check if the base64Image is valid
     if (!base64Image || !base64Image.startsWith('data:image/')) {
       console.error('Invalid base64 image string');

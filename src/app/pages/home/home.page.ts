@@ -1,3 +1,4 @@
+
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { CameraCapability, CameraManager } from 'src/app/lib/camera.manager';
@@ -25,7 +26,9 @@ export class HomePage implements OnInit {
   ) { }
 
   async ngOnInit() {
-    await this.refreshCameraInfo();
+    setTimeout(async () => {
+      await this.refreshCameraInfo();
+    }, 1000);
   }
 
   async refreshCameraInfo() {

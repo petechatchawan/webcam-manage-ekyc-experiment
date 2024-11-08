@@ -17,39 +17,47 @@ export interface CameraDevice {
 }
 
 export class CameraDeviceSelector {
-  private uaInfo = new UAInfo();
-  private uaParser: UAInfo;
   private availableCameraDevices: CameraDevice[] = [];
 
-  constructor() {
+  constructor(
+    private uaInfo = new UAInfo()
+  ) {
     const userAgent = navigator.userAgent;
-    this.uaParser = this.uaInfo.setUserAgent(userAgent);
+    this.uaInfo.setUserAgent(userAgent);
   }
 
   /**
-   * Selects a camera device based on preferred facing mode and device capabilities.
-   */
+   *
+   * Select camera
+   *
+   * */
+  // Main method to select camera based on device type
   public async selectCamera(
     videoDevices: MediaDeviceInfo[],
     preferredFacingMode: FacingMode
   ): Promise<MediaDeviceInfo | null> {
+    // console.log('Selecting camera with preferred facing mode:', preferredFacingMode);
     this.availableCameraDevices = await Promise.all(
       videoDevices.map(async (device, index) => {
+        console.log('Processing device:', device.label, 'at index:', index);
         let facingMode: FacingMode = FacingMode.Front;
         try {
           const capabilities = (device as InputDeviceInfo).getCapabilities();
-          if (capabilities.facingMode?.length) {
+          if (capabilities.facingMode && capabilities.facingMode.length > 0) {
             facingMode = capabilities.facingMode[0] as FacingMode;
           }
+          console.log('Device capabilities obtained:', capabilities);
         } catch (error) {
           console.warn('Failed to get device capabilities:', error);
         }
 
-        const isMobile = this.uaParser.isMobile() || this.uaParser.isTablet();
-        const isAndroid = this.uaParser.isOS('Android');
+        const isMobile = this.uaInfo.isMobile() || this.uaInfo.isTablet();
+        const isAndroid = this.uaInfo.isOS('Android');
         const deviceIndex = isMobile && isAndroid ? this.parseAndroidDeviceIndex(device.label) : index;
+        console.log('Assigned device index:', deviceIndex);
 
         return {
+          ...device,
           label: device.label || '',
           deviceId: device.deviceId,
           index: deviceIndex,
@@ -58,11 +66,14 @@ export class CameraDeviceSelector {
       })
     );
 
-    const cameraDevice = this.uaParser.isDesktop()
+    const cameraDevice = this.uaInfo.isDesktop()
       ? this.selectDesktopCamera()
       : this.selectMobileCamera(preferredFacingMode);
+    console.log('Selected camera device:', cameraDevice?.deviceId);
 
-    return videoDevices.find(device => device.deviceId === cameraDevice?.deviceId) || null;
+    const finalCamera = videoDevices.find(device => device.deviceId === cameraDevice?.deviceId);
+    console.log('Final camera device:', finalCamera?.deviceId);
+    return finalCamera || null;
   }
 
   private parseAndroidDeviceIndex = (label: string): number => {
@@ -84,9 +95,15 @@ export class CameraDeviceSelector {
 
   // Select mobile camera based on the facing mode and OS type
   private selectMobileCamera(preferredFacingMode: FacingMode): CameraDevice | null {
+    console.log('[CameraDevicesSelector] Selecting camera for mobile with preferred facing mode:', preferredFacingMode);
     const matchingCameras = this.availableCameraDevices.filter(camera => camera.facingMode === preferredFacingMode);
-    if (!matchingCameras.length) return null;
-    return this.uaParser.isOS('iOS') || this.uaParser.isOS('MacOS')
+    console.log('[CameraDevicesSelector] Matching cameras:', matchingCameras.map(camera => camera.deviceId));
+    if (!matchingCameras.length) {
+      console.log('[CameraDevicesSelector] No matching cameras found, returning null');
+      return null;
+    }
+    console.log('[CameraDevicesSelector] Selecting camera from matching cameras...');
+    return this.uaInfo.isOS('iOS') || this.uaInfo.isOS('MacOS')
       ? this.selectIosCamera(matchingCameras, preferredFacingMode)
       : this.selectAndroidCamera(matchingCameras);
   }
@@ -117,7 +134,10 @@ export class CameraDeviceSelector {
 
   // Select the best camera for Android by sorting by index (or label if needed)
   private selectAndroidCamera(cameras: CameraDevice[]): CameraDevice {
-    return cameras.reduce((prev, curr) => (prev.index < curr.index ? prev : curr));
+    console.log('[CameraDevicesSelector] Selecting camera for Android...');
+    console.log('[CameraDevicesSelector] Available cameras:', cameras.map(camera => camera.deviceId));
+    const selectedCamera = cameras.reduce((prev, curr) => (prev.index < curr.index ? prev : curr));
+    console.log('[CameraDevicesSelector] Selected camera for Android:', selectedCamera.deviceId);
+    return selectedCamera;
   }
 }
-

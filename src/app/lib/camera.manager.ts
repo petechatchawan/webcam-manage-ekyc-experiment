@@ -165,26 +165,21 @@ export class CameraManager {
        * เริ่มกล้องด้วยการตั้งค่าปัจจุบัน
        */
     public async startCamera(): Promise<void> {
-        console.log('Starting camera with current configuration...');
         this.isCameraInitializedFlag = false;
         const constraints = this.createConstraints();
-        console.log('Constraints created:', constraints);
 
         try {
-            const stream = await this.initializeStream(constraints);
-            console.log('Stream initialized:', stream);
-            this.saveActiveConfig(stream);
-            console.log('Active configuration saved.');
-            this.applyMirrorEffect();
-            console.log('Mirror effect applied.');
-            await this.setVideoStream(stream);
-            console.log('Video stream set successfully.');
+            const stream = await this.getUserMedia(constraints);
+            if (stream) {
+                this.saveActiveConfig(stream);
+                this.applyMirrorEffect();
+                await this.setVideoStream(stream);
+            }
         } catch (error) {
             console.error('Error starting camera:', error);
             throw error; // ส่งต่อ error ไปให้ startCameraWithResolution จัดการ
         } finally {
             this.isCameraInitializedFlag = true;
-            console.log('Camera initialization flag set to true.');
         }
     }
 
@@ -689,6 +684,7 @@ export class CameraManager {
 
         const autoSwapResolution = this.currentCameraConfig.autoSwapResolution ?? false;
         const finalResolution = this.getFinalResolution(resolution, autoSwapResolution);
+
         const videoConstraints: MediaTrackConstraints = {
             deviceId: this.currentCameraConfig.selectedDevice?.deviceId
                 ? { exact: this.currentCameraConfig.selectedDevice.deviceId }
@@ -729,25 +725,31 @@ export class CameraManager {
     }
 
     private async waitForVideoLoad(): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const video = this.currentCameraConfig.videoElement;
-            if (!video) {
-                return reject(new Error('Video element is null or undefined'));
-            }
+        const video = this.currentCameraConfig.videoElement;
+        if (!video) {
+            throw new Error('Video element is null or undefined');
+        }
 
-            video.addEventListener('loadedmetadata', () => {
+        return new Promise((resolve, reject) => {
+            const handleLoadedMetadata = () => {
                 try {
                     video.play();
                     this.emitSuccess('START_CAMERA_SUCCESS', 'Camera started successfully');
                     resolve();
                 } catch (error) {
                     reject(error);
+                } finally {
+                    video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+                    video.removeEventListener('error', handleError);
                 }
-            });
+            };
 
-            video.addEventListener('error', () => {
+            const handleError = () => {
                 reject(new Error('Failed to load video'));
-            });
+            };
+
+            video.addEventListener('loadedmetadata', handleLoadedMetadata);
+            video.addEventListener('error', handleError);
         });
     }
 
@@ -1062,8 +1064,6 @@ export class CameraManager {
         }
     }
 
-
-
     public destroy(): void {
         console.log('[CameraManager]: Destroying');
         // ยกเลิก event listeners
@@ -1151,7 +1151,6 @@ export class CameraManager {
 
             // กรองเอาเฉพาะกล้องที่รองรับ
             const supportedDevices = deviceCapabilities.filter(cap => cap.isSupported);
-
             if (supportedDevices.length === 0) {
                 throw new Error('No supported camera devices found');
             }
@@ -1175,7 +1174,7 @@ export class CameraManager {
                 }), {}),
                 // ใช้ความละเอียดของกล้องแรกเป็นค่าเริ่มต้น
                 supportedResolutions: defaultDeviceCapability.supportedResolutions,
-                defaultDevice: defaultDeviceCapability.device,
+                // defaultDevice: defaultDeviceCapability.device,
                 recommendedResolution: defaultDeviceCapability.recommendedResolution,
             };
 
@@ -1241,7 +1240,7 @@ export interface CameraCapability {
             error?: string;
         };
     };
-    defaultDevice?: MediaDeviceInfo;
+    // defaultDevice?: MediaDeviceInfo;
     recommendedResolution?: VideoResolutionPreset;
     errorMessage?: string;
 }
